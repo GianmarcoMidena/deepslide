@@ -34,11 +34,9 @@ Splits the data into a validation and test set. Default validation whole-slide i
 python code/1_split.py
 ```
 
-If you do not want to duplicate the data, append `--keep_orig_copy False` to the above command.
-
 **Inputs**: `all_wsi` 
 
-**Outputs**: `wsi_train`, `wsi_val`, `wsi_test`, `labels_train.csv`, `labels_val.csv`, `labels_test.csv`
+**Outputs**: `wsis_train.csv`, `wsis_val.csv`, `wsis_test.csv`
 
 Note that `all_wsi` must contain subfolders of images labeled by class. For instance, if your two classes are `a` and `n`, you must have `a/*.jpg` with the images in class `a` and `n/*.jpg` with images in class `n`.
 
@@ -61,7 +59,7 @@ python code/2_process_patches.py
 
 Note that this will take up a significant amount of space. Change `--num_train_per_class` to be smaller if you wish not to generate as many windows. If your histopathology images are H&E-stained, whitespace will automatically be filtered. Turn this off using the option `--type_histopath False`. Default overlapping area is 1/3 for test slides. Use 1 or 2 if your images are very large; you can also change this using the `--slide_overlap` option.
 
-**Inputs**: `wsi_train`, `wsi_val`, `wsi_test`
+**Inputs**: `all_wsi`, `wsis_train.csv`, `wsis_val.csv`, `wsis_test.csv`
 
 **Outputs**: `train_folder` (fed into model for training), `patches_eval_train` (for validation, sorted by WSI), `patches_eval_test` (for testing, sorted by WSI)
 
@@ -116,14 +114,9 @@ The simplest way to make a whole-slide inference is to choose the class with the
 python code/5_grid_search.py
 ```
 
-**Inputs**: `preds_val`, `labels_val.csv`
+**Inputs**: `preds_val`
 
 **Outputs**: `inference_val`
-
-### Example
-```
-python code/5_grid_search.py --preds_val different_labels_val.csv
-```
 
 ## 6. Visualization
 
@@ -133,7 +126,7 @@ A good way to see what the network is looking at is to visualize the predictions
 python code/6_visualize.py
 ```
 
-**Inputs**: `wsi_val`, `preds_val`
+**Inputs**: `wsis_val.csv`, `wsis_test.csv`, `preds_val`
 
 **Outputs**: `vis_val`
 
@@ -155,16 +148,10 @@ Do the final testing to compute the confusion matrix on the test set.
 python code/7_final_test.py
 ```
 
-**Inputs**: `preds_test`, `labels_test.csv`, `inference_val` and `labels_val` (for the best thresholds)
+**Inputs**: `preds_test`, `wsis_test.csv`, `inference_val` and `wsis_val.csv` (for the best thresholds)
 
 **Outputs**: `inference_test` and confusion matrix to stdout
 
-### Example
-```
-python code/7_final_test.py --labels_test different_labels_test.csv
-```
-
-Best of luck.
 
 # Quick Run
 

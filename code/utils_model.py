@@ -4,7 +4,7 @@ Using ResNet to train and test.
 
 Authors: Jason Wei, Behnaz Abdollahi, Saeed Hassanpour, Naofumi Tomita
 """
-
+import logging
 import operator
 import random
 import time
@@ -21,7 +21,8 @@ from PIL import Image
 from torch.optim import lr_scheduler
 from torchvision import (datasets, transforms)
 
-from utils import (get_image_paths, get_subfolder_paths)
+from utils import search_image_paths, extract_subfolder_paths
+
 
 ###########################################
 #             MISC FUNCTIONS              #
@@ -529,16 +530,18 @@ def get_best_model(checkpoints_folder: Path) -> str:
     """
     return max({
         model: parse_val_acc(model_path=model)
-        for model in get_image_paths(folder=checkpoints_folder)
+        for model in search_image_paths(folder=checkpoints_folder)
     }.items(),
                key=operator.itemgetter(1))[0]
 
 
-def get_predictions(patches_eval_folder: Path, output_folder: Path,
+def get_predictions(patches_eval_folder: Path,
+                    partition_name: str, output_folder: Path,
                     checkpoints_folder: Path, auto_select: bool,
-                    eval_model: Path, device: torch.device, classes: List[str],
-                    num_classes: int, path_mean: List[float],
-                    path_std: List[float], num_layers: int, pretrain: bool,
+                    eval_model: Path, device: torch.device,
+                    classes: List[str], num_classes: int,
+                    path_mean: List[float], path_std: List[float],
+                    num_layers: int, pretrain: bool,
                     batch_size: int, num_workers: int) -> None:
     """
     Main function for running the model on all of the generated patches.
@@ -559,6 +562,10 @@ def get_predictions(patches_eval_folder: Path, output_folder: Path,
         batch_size: Mini-batch size to use for training.
         num_workers: Number of workers to use for IO.
     """
+    logging.info(f"Finding {partition_name} patch predictions...")
+
+    logging.info(f"path_mean={path_mean}, path_std={path_std}")
+
     # Initialize the model.
     model_path = get_best_model(
         checkpoints_folder=checkpoints_folder) if auto_select else eval_model
@@ -578,7 +585,7 @@ def get_predictions(patches_eval_folder: Path, output_folder: Path,
 
     start = time.time()
     # Load the data for each folder.
-    image_folders = get_subfolder_paths(folder=patches_eval_folder)
+    image_folders = extract_subfolder_paths(folder=patches_eval_folder)
 
     # Where we want to write out the predictions.
     # Confirm the output directory exists.
@@ -586,7 +593,7 @@ def get_predictions(patches_eval_folder: Path, output_folder: Path,
 
     # For each WSI.
     for image_folder in image_folders:
-
+        print(image_folder)
         # Temporary fix. Need not to make folders with no crops.
         try:
             # Load the image dataset.
@@ -610,7 +617,7 @@ def get_predictions(patches_eval_folder: Path, output_folder: Path,
 
         # Load the image names so we know the coordinates of the patches we are predicting.
         image_folder = image_folder.joinpath(image_folder.name)
-        window_names = get_image_paths(folder=image_folder)
+        window_names = search_image_paths(folder=image_folder)
 
         print(f"testing on {num_test_image_windows} crops from {image_folder}")
 
@@ -621,19 +628,18 @@ def get_predictions(patches_eval_folder: Path, output_folder: Path,
 
             # Loop through all of the patches.
             for batch_num, (test_inputs, test_labels) in enumerate(dataloader):
-                batch_window_names = window_names[batch_num *
-                                                  batch_size:batch_num *
-                                                  batch_size + batch_size]
+                batch_window_names = window_names[batch_num * batch_size:
+                                                  batch_num * batch_size + batch_size]
 
-                confidences, test_preds = torch.max(nn.Softmax(dim=1)(model(
-                    test_inputs.to(device=device))),
-                                                    dim=1)
+                confidences, test_preds = \
+                    torch.max(nn.Softmax(dim=1)(model(test_inputs.to(device=device))), dim=1)
+
                 for i in range(test_preds.shape[0]):
                     # Find coordinates and predicted class.
-                    xy = batch_window_names[i].name.split(".")[0].split(";")
+                    x, y = batch_window_names[i].stem.split("_")[-2:]
 
                     writer.write(
-                        f"{','.join([xy[0], xy[1], f'{class_num_to_class[test_preds[i].data.item()]}', f'{confidences[i].data.item():.5f}'])}\n"
+                        f"{','.join([x, y, f'{class_num_to_class[test_preds[i].data.item()]}', f'{confidences[i].data.item():.5f}'])}\n"
                     )
 
     print(f"time for {patches_eval_folder}: {time.time() - start:.2f} seconds")

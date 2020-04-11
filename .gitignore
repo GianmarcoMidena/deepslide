@@ -1,9 +1,2 @@
-all*
-checkpoints*
-inference*
-labels*
-patches*
-preds*
-train*
-vis*
-wsi*
+__pycache__
+.idea
