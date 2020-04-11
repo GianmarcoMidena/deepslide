@@ -7,3 +7,5 @@ preds*
 train*
 vis*
 wsi*
+__pycache__
+.idea

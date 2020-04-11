@@ -7,11 +7,14 @@ Authors: Jason Wei, Behnaz Abdollahi, Saeed Hassanpour
 
 import argparse
 from pathlib import Path
+import logging
 
 import torch
 
 from compute_stats import compute_stats
-from utils import (get_classes, get_log_csv_name)
+from utils import get_classes, get_log_csv_name
+
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
 # Source: https://stackoverflow.com/questions/12151306/argparse-way-to-include-default-values-in-help
 parser = argparse.ArgumentParser(
@@ -40,15 +43,6 @@ parser.add_argument("--test_wsi_per_class",
                     type=int,
                     default=30,
                     help="Number of WSI per class to use in test set")
-# When splitting, do you want to move WSI or copy them?
-parser.add_argument(
-    "--keep_orig_copy",
-    type=bool,
-    default=True,
-    help=
-    "Whether to move or copy the WSI when splitting into training, validation, and test sets"
-)
-
 #######################################
 #               GENERAL               #
 #######################################
@@ -66,34 +60,19 @@ parser.add_argument("--patch_size",
 ##########################################
 #               DATA SPLIT               #
 ##########################################
-# The names of your to-be folders.
-parser.add_argument("--wsi_train",
-                    type=Path,
-                    default=Path("wsi_train"),
-                    help="Location to be created to store WSI for training")
-parser.add_argument("--wsi_val",
-                    type=Path,
-                    default=Path("wsi_val"),
-                    help="Location to be created to store WSI for validation")
-parser.add_argument("--wsi_test",
-                    type=Path,
-                    default=Path("wsi_test"),
-                    help="Location to be created to store WSI for testing")
-
 # Where the CSV file labels will go.
-parser.add_argument("--labels_train",
+parser.add_argument("--wsis_train",
                     type=Path,
-                    default=Path("labels_train.csv"),
-                    help="Location to store the CSV file labels for training")
-parser.add_argument(
-    "--labels_val",
-    type=Path,
-    default=Path("labels_val.csv"),
-    help="Location to store the CSV file labels for validation")
-parser.add_argument("--labels_test",
+                    default=Path("wsis_train.csv"),
+                    help="Location to store the CSV file info for training wsis")
+parser.add_argument("--wsis_val",
                     type=Path,
-                    default=Path("labels_test.csv"),
-                    help="Location to store the CSV file labels for testing")
+                    default=Path("wsis_val.csv"),
+                    help="Location to store the CSV file info for validation wsis")
+parser.add_argument("--wsis_test",
+                    type=Path,
+                    default=Path("wsis_test.csv"),
+                    help="Location to store the CSV file info for testing wsis")
 
 ###############################################################
 #               PROCESSING AND PATCH GENERATION               #
@@ -131,7 +110,7 @@ parser.add_argument(
 )
 
 # Target number of training patches per class.
-parser.add_argument("--num_train_per_class",
+parser.add_argument("--num_train_patches_per_class",
                     type=int,
                     default=80000,
                     help="Target number of training samples per class")
@@ -177,14 +156,6 @@ parser.add_argument("--image_ext",
                     type=str,
                     default="jpg",
                     help="Image extension for saving patches")
-
-# Produce patches for testing and validation by folder.  The code only works
-# for now when testing and validation are split by folder.
-parser.add_argument(
-    "--by_folder",
-    type=bool,
-    default=True,
-    help="Produce patches for testing and validation by folder.")
 
 #########################################
 #               TRANSFORM               #
@@ -385,7 +356,7 @@ threshold_search = (0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 colors = ("red", "white", "blue", "green", "purple", "orange", "black", "pink",
           "yellow")
 
-# Print the configuration.
+# log the configuration.
 # Source: https://stackoverflow.com/questions/44689546/how-to-print-out-a-dictionary-nicely-in-python/44689627
 # chr(10) and chr(9) are ways of going around the f-string limitation of
 # not allowing the '\' character inside.
