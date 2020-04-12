@@ -2,12 +2,12 @@ import logging
 from pathlib import Path
 import pandas as pd
 from typing import List
-import utils
+from code.utils import search_image_paths, extract_subfolder_paths
 
 
 class WSISplitter:
     """
-    Splits the data into training, validation, and testing sets.
+    Splits the data into learning, validation, and evaluation sets.
     """
 
     _IMAGE_ATTRIBUTES = ['id', 'path', 'label']
@@ -20,8 +20,8 @@ class WSISplitter:
             all_wsi: Location of the WSIs organized in subfolders by class.
             val_wsi_per_class: Number of WSI per class to use in the validation set.
             test_wsi_per_class: Number of WSI per class to use in the test set.
-            wsis_train: Location to store the CSV file labels for training.
-            wsis_test: Location to store the CSV file labels for testing.
+            wsis_train: Location to store the CSV file labels for learning.
+            wsis_test: Location to store the CSV file labels for evaluation.
             wsis_val: Location to store the CSV file labels for validation.
         """
         self._all_wsi = all_wsi
@@ -35,7 +35,7 @@ class WSISplitter:
         self._wsis_test_report = None
 
     def split(self) -> None:
-        logging.info("Splitting the slides into training, validation and test...")
+        logging.info("Splitting the slides into learning, validation and test...")
 
         self._create_report()
 
@@ -46,7 +46,7 @@ class WSISplitter:
         self._save_report()
 
     def _split_per_class(self, class_path):
-        class_image_paths = utils.search_image_paths(class_path)
+        class_image_paths = search_image_paths(class_path)
         self._check_n_slides_per_class(class_image_paths)
 
         train_image_paths, val_image_paths, test_image_paths = self._split_train_val_test_images(class_image_paths)
@@ -67,7 +67,7 @@ class WSISplitter:
         return train_image_paths, val_image_paths, test_image_paths
 
     def _search_class_paths(self) -> List[Path]:
-        return utils.extract_subfolder_paths(self._all_wsi)
+        return extract_subfolder_paths(self._all_wsi)
 
     def _check_n_slides_per_class(self, image_paths) -> None:
         assert len(image_paths) > self._val_wsi_per_class + self._test_wsi_per_class, \

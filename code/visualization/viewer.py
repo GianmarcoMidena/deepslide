@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from imageio import imread, imsave
@@ -33,10 +33,10 @@ class Viewer:
         n_slides = wsis_info.shape[0]
         # Find list of WSI.
         logging.info(f"{n_slides} {partition_name} whole slides found")
-        prediction_to_color = {
+        prediction_to_color = pd.Series({
             self._classes[i]: self._color_to_np_color(color=self._colors[i])
             for i in range(self._num_classes)
-        }
+        })
         # Go over all of the WSI.
         for _, wsi_info in wsis_info.iterrows():
             # Read in the image.
@@ -59,9 +59,7 @@ class Viewer:
                 # Add the predictions to the image and save it.
                 imsave(uri=output_path,
                        im=self._add_predictions_to_image(
-                           xy_to_pred_class=self._get_xy_to_pred_class(
-                               window_prediction_folder=preds_folder,
-                               img_name=wsi_info['id']),
+                           predictions=pd.read_csv(preds_folder.joinpath(wsi_info['id']).with_suffix(".csv")),
                            image=whole_slide_numpy,
                            prediction_to_color=prediction_to_color,
                            patch_size=self._patch_size))
@@ -99,14 +97,13 @@ class Viewer:
 
     @staticmethod
     def _add_predictions_to_image(
-            xy_to_pred_class: Dict[Tuple[str, str], Tuple[str, float]],
-            image: np.ndarray, prediction_to_color: Dict[str, np.ndarray],
+            predictions: pd.DataFrame,
+            image: np.ndarray, prediction_to_color: pd.Series,
             patch_size: int) -> np.ndarray:
         """
         Overlay the predicted dots (classes) on the WSI.
 
         Args:
-            xy_to_pred_class: Dictionary mapping coordinates to predicted class along with the confidence.
             image: WSI to add predicted dots to.
             prediction_to_color: Dictionary mapping string color to NumPy ndarray color.
             patch_size: Size of the patches extracted from the WSI.
@@ -114,44 +111,12 @@ class Viewer:
         Returns:
             The WSI with the predicted class dots overlaid.
         """
-        for x, y in xy_to_pred_class.keys():
-            prediction, __ = xy_to_pred_class[x, y]
-            x = int(x)
-            y = int(y)
-
+        for _, r in predictions.iterrows():
+            x = r['x']
+            y = r['y']
+            prediction = r['prediction']
             # Enlarge the dots so they are visible at larger scale.
             start = round((0.9 * patch_size) / 2)
             end = round((1.1 * patch_size) / 2)
-            image[x + start:x + end, y + start:y +
-                                               end, :] = prediction_to_color[prediction]
-
+            image[x + start:x + end, y + start:y + end, :] = prediction_to_color[prediction]
         return image
-
-    @staticmethod
-    def _get_xy_to_pred_class(window_prediction_folder: Path, img_name: str) \
-            -> Dict[Tuple[str, str], Tuple[str, float]]:
-        """
-        Find the dictionary of predictions.
-
-        Args:
-            window_prediction_folder: Path to the folder containing a CSV file with the predicted classes.
-            img_name: Name of the image to find the predicted classes for.
-
-        Returns:
-            A dictionary mapping image coordinates to the predicted class and the confidence of the prediction.
-        """
-        xy_to_pred_class = {}
-
-        with window_prediction_folder.joinpath(img_name).with_suffix(".csv").open(
-                mode="r") as csv_lines_open:
-            csv_lines = csv_lines_open.readlines()[1:]
-
-            predictions = [line[:-1].split(",") for line in csv_lines]
-            for prediction in predictions:
-                x = prediction[0]
-                y = prediction[1]
-                pred_class = prediction[2]
-                confidence = float(prediction[3])
-                # Implement thresholding.
-                xy_to_pred_class[(x, y)] = (pred_class, confidence)
-        return xy_to_pred_class

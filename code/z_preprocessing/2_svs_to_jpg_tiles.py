@@ -1,22 +1,11 @@
+import argparse
 import os
-import sys
 from math import ceil
 from os import listdir
 from os.path import isfile, join
 
-import numpy as np
-from scipy.misc import imsave
-from PIL import Image
-from random import randint
-import time
-from scipy.stats import mode
-import cv2
 import openslide
-
-import skimage.measure
-from skimage.transform import rescale, rotate
-import time
-import argparse
+from PIL import Image
 
 compression_factor = 3
 window_size = 10000

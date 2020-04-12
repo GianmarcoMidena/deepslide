@@ -31,7 +31,7 @@ Take a look at `code/config.py` before you begin to get a feel for what paramete
 Splits the data into a validation and test set. Default validation whole-slide images (WSI) per class is 20 and test images per class is 30. You can change these numbers by changing the `--val_wsi_per_class` and `--test_wsi_per_class` flags at runtime. You can skip this step if you did a custom split (for example, you need to split by patients).
 
 ```
-python code/1_split.py
+python deepslide split
 ```
 
 **Inputs**: `all_wsi` 
@@ -42,10 +42,10 @@ Note that `all_wsi` must contain subfolders of images labeled by class. For inst
 
 ### Example
 ```
-python code/1_split.py --val_wsi_per_class 10 --test_wsi_per_class 20
+python deepslide split --val_wsi_per_class 10 --test_wsi_per_class 20
 ```
 
-## 2. Data Processing
+## 2. Tiling
 
 - Generate patches for the training set.
 - Balance the class distribution for the training set.
@@ -54,7 +54,7 @@ python code/1_split.py --val_wsi_per_class 10 --test_wsi_per_class 20
 - Generate patches by folder for WSI in the testing set.
 
 ```
-python code/2_process_patches.py
+python deepslide tile
 ```
 
 Note that this will take up a significant amount of space. Change `--num_train_per_class` to be smaller if you wish not to generate as many windows. If your histopathology images are H&E-stained, whitespace will automatically be filtered. Turn this off using the option `--type_histopath False`. Default overlapping area is 1/3 for test slides. Use 1 or 2 if your images are very large; you can also change this using the `--slide_overlap` option.
@@ -65,14 +65,14 @@ Note that this will take up a significant amount of space. Change `--num_train_p
 
 ### Example
 ```
-python code/2_process_patches.py --num_train_per_class 20000 --slide_overlap 2
+python deepslide tile --num_train_per_class 20000 --slide_overlap 2
 ```
 
 
 ## 3. Model Training
 
 ```
-CUDA_VISIBLE_DEVICES=0 python code/3_train.py
+CUDA_VISIBLE_DEVICES=0 python deepslide train
 ```
 
 We recommend using ResNet-18 if you are training on a relatively small histopathology dataset. You can change hyperparameters using the `argparse` flags. There is an option to retrain from a previous checkpoint. Model checkpoints are saved by default every epoch in `checkpoints`.
@@ -83,7 +83,7 @@ We recommend using ResNet-18 if you are training on a relatively small histopath
 
 ### Example
 ```
-CUDA_VISIBLE_DEVICES=0 python code/3_train.py --batch_size 32 --num_epochs 100 --save_interval 5
+CUDA_VISIBLE_DEVICES=0 python deepslide train --batch_size 32 --num_epochs 100 --save_interval 5
 ```
 
 ## 4. Testing on WSI
@@ -91,7 +91,7 @@ CUDA_VISIBLE_DEVICES=0 python code/3_train.py --batch_size 32 --num_epochs 100 -
 Run the model on all the patches for each WSI in the validation and test set.
 
 ```
-CUDA_VISIBLE_DEVICES=0 python code/4_test.py
+CUDA_VISIBLE_DEVICES=0 python deepslide test
 ```
 
 We automatically choose the model with the best validation accuracy. You can also specify your own. You can change the thresholds used in the grid search by specifying the `threshold_search` variable in `code/config.py`.
@@ -102,7 +102,7 @@ We automatically choose the model with the best validation accuracy. You can als
 
 ### Example
 ```
-CUDA_VISIBLE_DEVICES=0 python code/4_test.py --auto_select False
+CUDA_VISIBLE_DEVICES=0 python deepslide test --auto_select False
 ```
 
 
@@ -111,7 +111,7 @@ CUDA_VISIBLE_DEVICES=0 python code/4_test.py --auto_select False
 The simplest way to make a whole-slide inference is to choose the class with the most patch predictions. We can also implement thresholding on the patch level to throw out noise. To find the best thresholds, we perform a grid search. This function will generate csv files for each WSI with the predictions for each patch.
 
 ```
-python code/5_grid_search.py
+python deepslide grid_search
 ```
 
 **Inputs**: `preds_val`
@@ -123,7 +123,7 @@ python code/5_grid_search.py
 A good way to see what the network is looking at is to visualize the predictions for each class.
 
 ```
-python code/6_visualize.py
+python deepslide visualize
 ```
 
 **Inputs**: `wsis_val.csv`, `wsis_test.csv`, `preds_val`
@@ -136,7 +136,7 @@ You can change the colors in `colors` in `code/config.py`
 
 ### Example
 ```
-python code/6_visualize.py --vis_test different_vis_test_directory
+python deepslide visualize --vis_test different_vis_test_directory
 ```
 
 
@@ -145,7 +145,7 @@ python code/6_visualize.py --vis_test different_vis_test_directory
 Do the final testing to compute the confusion matrix on the test set.
 
 ```
-python code/7_final_test.py
+python deepslide final_test
 ```
 
 **Inputs**: `preds_test`, `wsis_test.csv`, `inference_val` and `wsis_val.csv` (for the best thresholds)

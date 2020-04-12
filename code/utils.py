@@ -6,8 +6,12 @@ Authors: Jason Wei, Behnaz Abdollahi, Saeed Hassanpour
 """
 
 import datetime
+import logging
+from glob import glob
 from pathlib import Path
-from typing import List
+from typing import Dict, List
+
+import pandas as pd
 
 
 def get_classes(folder: Path) -> List[str]:
@@ -95,3 +99,78 @@ def get_all_image_paths(master_folder: Path) -> List[Path]:
     else:
         all_paths = search_image_paths(folder=master_folder)
     return all_paths
+
+
+def report_predictions(patches_pred_folder: Path, output_folder: Path,
+                       conf_thresholds: Dict[str, float],
+                       classes: List[str], image_ext: str) -> None:
+    """
+    Report the predictions for the WSI into a CSV file.
+
+    Args:
+        patches_pred_folder: Folder containing the predicted classes for each patch.
+        output_folder: Folder to save the predicted classes for each WSI for each threshold.
+        conf_thresholds: The confidence thresholds for determining membership in a class (filter out noise).
+        classes: Names of the classes in the dataset.
+        image_ext: Image extension for saving patches.
+    """
+    logging.info("Outputting predictions...")
+
+    # Open a new CSV file for each set of confidence thresholds used on each set of WSI.
+    output_file = "".join([
+        f"{_class}{str(conf_thresholds[_class])[1:]}_"
+        for _class in conf_thresholds
+    ])[:-1]
+
+    output_csv_path = output_folder.joinpath(f"{output_file}.csv")
+
+    # Confirm the output directory exists.
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    columns = ["img", "predicted"] + \
+              [f'percent_{_class}' for _class in classes] + \
+              [f'count_{_class}' for _class in classes]
+    report = pd.DataFrame(columns=columns)
+
+    csv_paths = sorted(glob(str(patches_pred_folder.joinpath("*.csv"))))
+    for csv_path in csv_paths:
+        prediction = _get_prediction(patches_pred_file=Path(csv_path),
+                                     conf_thresholds=conf_thresholds,
+                                     classes=classes, image_ext=image_ext)
+        report = report.append(prediction, sort=False, ignore_index=True)
+
+    report.to_csv(output_csv_path, index=False)
+
+
+def _get_prediction(patches_pred_file: Path, conf_thresholds: Dict[str, float],
+                    classes: List[str], image_ext: str) -> str:
+    """
+    Find the predicted class for a single WSI.
+
+    Args:
+        patches_pred_file: File containing the predicted classes for the patches that make up the WSI.
+        conf_thresholds: Confidence thresholds to determine membership in a class (filter out noise).
+        image_ext: Image extension for saving patches.
+
+    Returns:
+        A string containing the accuracy of classification for each class using the thresholds.
+    """
+
+    patches_pred = pd.read_csv(patches_pred_file)
+
+    conf_thresholds = pd.Series(conf_thresholds)
+
+    conf_over_th = patches_pred['confidence'].gt(conf_thresholds.loc[patches_pred['prediction']].values)
+    class_to_count = patches_pred.loc[conf_over_th, 'prediction']\
+                                 .value_counts(normalize=True)\
+                                 .reindex(index=classes, fill_value=0)
+    class_to_percent = class_to_count.divide(class_to_count.sum())
+
+    # Creating the line for output to CSV.
+    arg_max = class_to_percent.sort_values(ascending=False).index[0]
+    return {
+        "img": Path(patches_pred_file.name).with_suffix(f'.{image_ext}'),
+        "predicted": arg_max,
+        **{f'percent_{_class}': class_to_percent.loc[_class] for _class in classes},
+        **{f'count_{_class}': class_to_count.loc[_class] for _class in classes}
+    }
