@@ -34,7 +34,7 @@ class FinalTester:
         best_csv = None
         for prediction_csv_path in prediction_csv_paths:
             predictions = pd.read_csv(prediction_csv_path)
-            predictions['image_id'] = predictions['img'].str.rsplit(".", expand=True).iloc[:, 0]
+            predictions['image_id'] = predictions['img'].str.rsplit(".", n=1, expand=True).iloc[:, 0]
             true_labels = wsis_info.loc[wsis_info['id'].isin(predictions['image_id'].values), ['id', 'label']] \
                 .rename(columns={'id': 'image_id'})
             prediction_labels = predictions[['image_id', 'predicted']]
@@ -63,7 +63,7 @@ class FinalTester:
         prediction_csv_paths = sorted(glob(str(inference_folder.joinpath("*.csv"))))
         for prediction_csv_path in prediction_csv_paths:
             predictions = pd.read_csv(prediction_csv_path)
-            predictions['image_id'] = predictions['img'].str.rsplit(".", expand=True).iloc[:, 0]
+            predictions['image_id'] = predictions['img'].str.rsplit(".", n=1, expand=True).iloc[:, 0]
             true_labels = wsis_info.loc[wsis_info['id'].isin(predictions['image_id'].values), ['id', 'label']] \
                 .rename(columns={'id': 'image_id'})
             prediction_labels = predictions[['image_id', 'predicted']]

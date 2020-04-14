@@ -103,7 +103,7 @@ class Tester:
                                       report: pd.DataFrame):
         batch_window_names = window_names.iloc[batch_index * self._batch_size:
                                                batch_index * self._batch_size + self._batch_size]
-        batch_window_names = batch_window_names.astype(str).str.rsplit(".", expand=True).iloc[:, 0]
+        batch_window_names = batch_window_names.astype(str).str.rsplit(".", n=1, expand=True).iloc[:, 0]
         x, y = batch_window_names.str.split("_", expand=True).iloc[:, -2:].values.T.tolist()
 
         confidences, test_preds = \
