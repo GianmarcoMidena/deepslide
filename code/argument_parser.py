@@ -1,11 +1,5 @@
 import argparse
 from pathlib import Path
-from typing import Optional, Sequence, Text
-
-import torch
-
-from code.compute_stats import compute_stats
-from code.utils import get_classes
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -22,13 +16,6 @@ class ArgumentParser(argparse.ArgumentParser):
                          argument_default=argument_default,
                          conflict_handler=conflict_handler,
                          add_help=add_help, allow_abbrev=allow_abbrev)
-        self._after_fuctions = []
-
-    def parse_args(self, args=None, namespace=None):
-        args = super().parse_args(args, namespace)
-        for f in self._after_fuctions:
-            args = f(args)
-        return args
 
     def with_all_wsi(self):
         # Input folders for learning images.
@@ -40,6 +27,23 @@ class ArgumentParser(argparse.ArgumentParser):
             type=Path,
             default=Path("all_wsi"),
             help="Location of the WSI organized in subfolders by class")
+        return self
+
+    def with_wsis_info(self):
+        self.add_argument(
+            "--wsis_info",
+            type=Path,
+            default=Path("wsis_info.csv"),
+            help="Location to a CSV file containing wsis metadata"
+        )
+        return self
+
+    def with_by_patient(self):
+        self.add_argument(
+            "--by_patient",
+            default=False,
+            action="store_true",
+            help="Split by patient")
         return self
 
     def with_val_wsi_per_class(self):

@@ -6,6 +6,8 @@ def split(args):
     args = Configurer(args).build()
 
     WSISplitter(all_wsi=args.all_wsi,
+                by_patient=args.by_patient,
+                wsis_info=args.wsis_info,
                 wsis_train=args.wsis_train,
                 wsis_test=args.wsis_test,
                 wsis_val=args.wsis_val,
@@ -16,6 +18,8 @@ def split(args):
 def add_parser(subparsers):
     subparsers.add_parser("split") \
         .with_all_wsi() \
+        .with_by_patient() \
+        .with_wsis_info() \
         .with_wsis_train() \
         .with_wsis_val() \
         .with_wsis_test() \

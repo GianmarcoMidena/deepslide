@@ -76,9 +76,8 @@ def extract_subfolder_paths(folder: Path) -> List[Path]:
     """
     return sorted([
         folder.joinpath(f.name) for f in folder.iterdir()
-        if ((folder.joinpath(f.name).is_dir()) and (".DS_Store" not in f.name))
-    ],
-                  key=str)
+        if (folder.joinpath(f.name).is_dir()) and (not f.name.startswith('.'))
+    ], key=str)
 
 
 def get_all_image_paths(master_folder: Path) -> List[Path]:

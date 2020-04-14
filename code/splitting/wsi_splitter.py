@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from glob import glob
 import pandas as pd
 from typing import List
 from code.utils import search_image_paths, extract_subfolder_paths
@@ -12,7 +13,7 @@ class WSISplitter:
 
     _IMAGE_ATTRIBUTES = ['id', 'path', 'label']
 
-    def __init__(self, all_wsi: Path, val_wsi_per_class: int,
+    def __init__(self, all_wsi: Path, by_patient: bool, wsis_info: Path, val_wsi_per_class: int,
                  test_wsi_per_class: int, wsis_train: Path,
                  wsis_test: Path, wsis_val: Path):
         """
@@ -20,11 +21,10 @@ class WSISplitter:
             all_wsi: Location of the WSIs organized in subfolders by class.
             val_wsi_per_class: Number of WSI per class to use in the validation set.
             test_wsi_per_class: Number of WSI per class to use in the test set.
-            wsis_train: Location to store the CSV file labels for learning.
-            wsis_test: Location to store the CSV file labels for evaluation.
-            wsis_val: Location to store the CSV file labels for validation.
         """
         self._all_wsi = all_wsi
+        self._by_patient = by_patient
+        self._wsis_info = wsis_info
         self._val_wsi_per_class = val_wsi_per_class
         self._test_wsi_per_class = test_wsi_per_class
         self._wsis_train_path = wsis_train
@@ -39,11 +39,50 @@ class WSISplitter:
 
         self._create_report()
 
-        class_paths = self._search_class_paths()
-        for class_path in class_paths:
-            self._split_per_class(class_path)
+        if self._by_patient and self._wsis_info is not None:
+            self._split_by_patient()
+        else:
+            class_paths = self._search_class_paths()
+            for class_path in class_paths:
+                self._split_per_class(class_path)
 
         self._save_report()
+
+    def _split_by_patient(self):
+        wsis_info = pd.read_csv(self._wsis_info)
+        labels = wsis_info['label'].unique()
+        wsis_info = wsis_info.assign(v=1).pivot_table(index='patient_id', columns='label', values='v', aggfunc='sum',
+                                                      fill_value=0)
+        wsis_info['std'] = wsis_info[labels].std(axis=1)
+        wsis_info = wsis_info.sort_values('std', ascending=True).drop('std', axis=1)
+
+        min_images_per_class_cumsum = wsis_info[labels].min(axis=1).cumsum()
+        last_test_patient_id = \
+            min_images_per_class_cumsum.loc[min_images_per_class_cumsum >= self._test_wsi_per_class].index[0]
+        last_test_patient_loc = min_images_per_class_cumsum.index.get_loc(last_test_patient_id)
+        test_set_patient_ids = min_images_per_class_cumsum.iloc[:last_test_patient_loc + 1].index.values
+
+        min_images_per_class_cumsum = min_images_per_class_cumsum.iloc[last_test_patient_loc + 1:]\
+            .subtract(min_images_per_class_cumsum.iloc[last_test_patient_loc])
+        last_val_patient_id = \
+            min_images_per_class_cumsum.loc[min_images_per_class_cumsum >= self._val_wsi_per_class].index[0]
+        last_val_patient_loc = min_images_per_class_cumsum.index.get_loc(last_val_patient_id)
+        val_set_patient_ids = min_images_per_class_cumsum.iloc[:last_val_patient_loc + 1].index.values
+
+        train_set_patient_ids = min_images_per_class_cumsum.iloc[last_val_patient_loc + 1:].index.values
+
+        self._search_image_paths_by_patient_ids(train_set_patient_ids, val_set_patient_ids, test_set_patient_ids)
+
+    def _search_image_paths_by_patient_ids(self, train_set_patient_ids, val_set_patient_ids, test_set_patient_ids):
+        paths = glob(str(self._all_wsi.joinpath("**").joinpath("*.*")), recursive=True)
+        images_info = pd.Series(paths).to_frame('path')
+        images_info['filename'] = images_info['path'].str.rsplit("/", n=1, expand=True)[1]
+        images_info['patient_id'] = images_info['filename'].str.rsplit("-", n=1, expand=True)[0]
+        images_info['path'] = images_info['path'].apply(Path)
+        train_image_paths = images_info.loc[images_info['patient_id'].isin(train_set_patient_ids), 'path']
+        val_image_paths = images_info.loc[images_info['patient_id'].isin(val_set_patient_ids), 'path']
+        test_image_paths = images_info.loc[images_info['patient_id'].isin(test_set_patient_ids), 'path']
+        self._report_splits(train_image_paths, val_image_paths, test_image_paths)
 
     def _split_per_class(self, class_path):
         class_image_paths = search_image_paths(class_path)
