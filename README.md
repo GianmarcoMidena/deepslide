@@ -26,7 +26,35 @@ This repository is a sliding window framework for classification of high resolut
 
 Take a look at `code/config.py` before you begin to get a feel for what parameters can be changed.
 
-## 1. Train-Val-Test Split:
+1. Downscaling
+2. Splitting
+3. Tiling
+4. Training
+5. Testing
+6. Grid Searching
+7. Visualization
+8. Final testing
+
+## 1. Downscaling:
+
+Scale down the original slides.
+
+```
+python deepslide downscale
+```
+
+**Inputs**: `original_slides`, `downscale_factor` 
+
+**Outputs**: `all_wsi`
+
+Note that `original_slides` must contain subfolders of images labeled by class. For instance, if your two classes are `a` and `n`, you must have `a/*.jpg` with the images in class `a` and `n/*.svs` with images in class `n`.
+
+### Example
+```
+python deepslide downscale --downscale_factor 16
+```
+
+## 2. Train-Val-Test Split:
 
 Splits the data into a validation and test set. Default validation whole-slide images (WSI) per class is 20 and test images per class is 30. You can change these numbers by changing the `--val_wsi_per_class` and `--test_wsi_per_class` flags at runtime. You can skip this step if you did a custom split (for example, you need to split by patients).
 
@@ -34,7 +62,7 @@ Splits the data into a validation and test set. Default validation whole-slide i
 python deepslide split
 ```
 
-**Inputs**: `all_wsi` 
+**Inputs**: `all_wsi`, `wsis_info` 
 
 **Outputs**: `wsis_train.csv`, `wsis_val.csv`, `wsis_test.csv`
 
@@ -42,10 +70,10 @@ Note that `all_wsi` must contain subfolders of images labeled by class. For inst
 
 ### Example
 ```
-python deepslide split --val_wsi_per_class 10 --test_wsi_per_class 20
+python deepslide split --by_patient --val_wsi_per_class 10 --test_wsi_per_class 20
 ```
 
-## 2. Tiling
+## 3. Tiling
 
 - Generate patches for the training set.
 - Balance the class distribution for the training set.
@@ -69,7 +97,7 @@ python deepslide tile --num_train_per_class 20000 --slide_overlap 2
 ```
 
 
-## 3. Model Training
+## 4. Model Training
 
 ```
 CUDA_VISIBLE_DEVICES=0 python deepslide train
@@ -86,7 +114,7 @@ We recommend using ResNet-18 if you are training on a relatively small histopath
 CUDA_VISIBLE_DEVICES=0 python deepslide train --batch_size 32 --num_epochs 100 --save_interval 5
 ```
 
-## 4. Testing on WSI
+## 5. Testing on WSI
 
 Run the model on all the patches for each WSI in the validation and test set.
 
@@ -106,7 +134,7 @@ CUDA_VISIBLE_DEVICES=0 python deepslide test --auto_select False
 ```
 
 
-## 5. Searching for Best Thresholds
+## 6. Searching for Best Thresholds
 
 The simplest way to make a whole-slide inference is to choose the class with the most patch predictions. We can also implement thresholding on the patch level to throw out noise. To find the best thresholds, we perform a grid search. This function will generate csv files for each WSI with the predictions for each patch.
 
@@ -118,7 +146,7 @@ python deepslide grid_search
 
 **Outputs**: `inference_val`
 
-## 6. Visualization
+## 7. Visualization
 
 A good way to see what the network is looking at is to visualize the predictions for each class.
 
@@ -140,7 +168,7 @@ python deepslide visualize --vis_test different_vis_test_directory
 ```
 
 
-## 7. Final Testing
+## 8. Final Testing
 
 Do the final testing to compute the confusion matrix on the test set.
 

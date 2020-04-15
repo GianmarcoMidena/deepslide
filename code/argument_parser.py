@@ -26,7 +26,20 @@ class ArgumentParser(argparse.ArgumentParser):
             "--all_wsi",
             type=Path,
             default=Path("all_wsi"),
-            help="Location of the WSI organized in subfolders by class")
+            help="Location of the WSIs organized in subfolders by class")
+        return self
+
+    def with_original_slides(self):
+        self.add_argument(
+            "--original_slides",
+            type=Path,
+            default=Path("original_slides"),
+            help="Location of the original WSIs organized in subfolders by class")
+        return self
+
+    def with_downscale_factor(self):
+        self.add_argument("--downscale_factor",
+                          type=int, required=True)
         return self
 
     def with_wsis_info(self):
@@ -202,6 +215,13 @@ class ArgumentParser(argparse.ArgumentParser):
                           type=str,
                           default="jpg",
                           help="Image extension for saving patches")
+        return self
+
+    def with_original_wsi_ext(self):
+        self.add_argument("--original_wsi_ext",
+                          type=str,
+                          default="svs",
+                          help="Original WSI extension")
         return self
 
     def with_color_jitter_brightness(self):

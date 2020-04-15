@@ -7,6 +7,8 @@ Authors: Jason Wei, Behnaz Abdollahi, Saeed Hassanpour
 
 import argparse
 import logging
+
+from .downscaling import downscale
 from .splitting import split
 from .tiling import process_patches
 from .learning import train
@@ -21,6 +23,7 @@ logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 parser = argparse.ArgumentParser(description="DeepSlide",
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 subparsers = parser.add_subparsers(parser_class=ArgumentParser)
+downscale.add_parser(subparsers)
 split.add_parser(subparsers)
 process_patches.add_parser(subparsers)
 train.add_parser(subparsers)
