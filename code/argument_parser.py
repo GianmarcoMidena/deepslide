@@ -190,21 +190,21 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Scalar to use for reducing image to check for purple.")
         return self
 
-    def with_slide_overlap(self):
+    def with_test_patch_overlap_factor(self):
         # Sliding window overlap factor (for evaluation).
         # For generating patches during the learning phase, we slide a window to overlap by some factor.
         # Must be an integer. 1 means no overlap, 2 means overlap by 1/2, 3 means overlap by 1/3.
         # Recommend 2 for very high resolution, 3 for medium, and 5 not extremely high resolution images.
-        self.add_argument("--slide_overlap",
-                            type=int,
-                            default=3,
-                            help="Sliding window overlap factor for the evaluation phase")
+        self.add_argument("--test_patch_overlap_factor",
+                          type=int,
+                          default=3,
+                          help="Sliding window overlap factor for the evaluation phase")
         return self
 
-    def with_gen_val_patches_overlap_factor(self):
+    def with_val_patch_overlap_factor(self):
         # Overlap factor to use when generating validation patches.
         self.add_argument(
-            "--gen_val_patches_overlap_factor",
+            "--val_patch_overlap_factor",
             type=float,
             default=1.5,
             help="Overlap factor to use when generating validation patches.")

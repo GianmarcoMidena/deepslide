@@ -3,9 +3,9 @@ import itertools
 import logging
 import math
 import time
-from multiprocessing import (Process, Queue, RawArray)
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from typing import (Callable, Dict, Tuple)
+from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -16,20 +16,11 @@ Image.MAX_IMAGE_PIXELS = None
 
 
 class PatchExtractor:
-    def __init__(self):
-        pass
-
-    def gen_train_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
-                          n_patches_per_class: int, num_workers: int,
-                          patch_size: int, purple_threshold: int,
-                          purple_scale_size: int, image_ext: str,
-                          type_histopath: bool) -> None:
+    def __init__(self, patch_size: int, purple_threshold: int,
+                 purple_scale_size: int, image_ext: str, type_histopath: bool,
+                 num_workers: int):
         """
-        Generates all patches for classes in the learning set.
-
         Args:
-            output_folder: Folder to save the patches to.
-            n_patches_per_class: The desired number of learning patches per class.
             num_workers: Number of workers to use for IO.
             patch_size: Size of the patches extracted from the WSI.
             purple_threshold: Number of purple points for region to be considered purple.
@@ -37,164 +28,141 @@ class PatchExtractor:
             image_ext: Image extension for saving patches.
             type_histopath: Only look for purple histopathology images and filter whitespace.
         """
-        logging.info("Generating learning patches...")
+        self._patch_size = patch_size
+        self._purple_threshold = purple_threshold
+        self._purple_scale_size = purple_scale_size
+        self._image_ext = image_ext
+        self._type_histopath = type_histopath
+        self._num_workers = num_workers
 
-        # Find how much patches should overlap for each class.
-        class_to_overlap_factor = self._calc_class_to_overlap_factor(wsi_info=wsis_info,
-                                                                     n_patches_per_class=n_patches_per_class)
+    def gen_train_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
+                          n_patches_per_class: int) -> None:
+        """
+        Generates all patches for classes in the training set.
 
-        # Produce the patches.
-        classes = wsis_info['label'].unique()
-        for class_i in classes:
-            class_wsis_info = wsis_info.loc[wsis_info['label'] == class_i]
-            self.produce_patches(wsis_info=class_wsis_info,
-                                 partition_name='learning',
-                                 output_folder=output_folder.joinpath(class_i),
-                                 inverse_overlap_factor=class_to_overlap_factor[class_i],
-                                 num_workers=num_workers,
-                                 patch_size=patch_size,
-                                 purple_threshold=purple_threshold,
-                                 purple_scale_size=purple_scale_size,
-                                 image_ext=image_ext,
-                                 type_histopath=type_histopath)
+        Args:
+            output_folder: Folder to save the patches to.
+            n_patches_per_class: The desired number of training patches per class.
+        """
+        logging.info("Generating training patches...")
+
+        step_size_by_class = self._calc_step_size_by_class(wsis_info=wsis_info,
+                                                           n_patches_per_class=n_patches_per_class)
+
+        for class_i in self._extract_classes(wsis_info):
+            self._produce_patches_by_class(class_i=class_i,
+                                           wsis_info=wsis_info,
+                                           partition_name='training',
+                                           output_folder=output_folder,
+                                           step_size=step_size_by_class[class_i],
+                                           by_folder=False)
 
     def gen_val_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
-                        overlap_factor: float, num_workers: int, patch_size: int,
-                        purple_threshold: int, purple_scale_size: int,
-                        image_ext: str, type_histopath: bool) -> None:
+                        step_size: int) -> None:
         """
         Generates all validation patches.
 
         Args:
             output_folder: Folder to save the patches to.
-            overlap_factor: The amount of overlap between patches.
-            num_workers: Number of workers to use for IO.
-            patch_size: Size of the patches extracted from the WSI.
-            purple_threshold: Number of purple points for region to be considered purple.
-            purple_scale_size: Scalar to use for reducing image to check for purple.
-            image_ext: Image extension for saving patches.
-            type_histopath: Only look for purple histopathology images and filter whitespace.
         """
         logging.info("Generating validation patches...")
 
-        # Produce the patches.
-        classes = wsis_info['label'].unique()
-        for class_i in classes:
-            class_wsis_info = wsis_info.loc[wsis_info['label'] == class_i]
-            self.produce_patches(wsis_info=class_wsis_info, partition_name='validation',
-                                 output_folder=output_folder.joinpath(class_i),
-                                 inverse_overlap_factor=overlap_factor,
-                                 num_workers=num_workers,
-                                 patch_size=patch_size,
-                                 purple_threshold=purple_threshold,
-                                 purple_scale_size=purple_scale_size,
-                                 image_ext=image_ext,
-                                 type_histopath=type_histopath)
+        for class_i in self._extract_classes(wsis_info):
+            self._produce_patches_by_class(class_i=class_i,
+                                           wsis_info=wsis_info,
+                                           partition_name='validation',
+                                           output_folder=output_folder,
+                                           step_size=step_size,
+                                           by_folder=False)
 
-    def produce_patches(self, wsis_info: pd.DataFrame, output_folder: Path, partition_name: str,
-                        inverse_overlap_factor: float,
-                        num_workers: int, patch_size: int, purple_threshold: int,
-                        purple_scale_size: int, image_ext: str,
-                        type_histopath: bool) -> None:
+    def _produce_patches_by_class(self, class_i: str, wsis_info: pd.DataFrame,
+                                  output_folder: Path, partition_name: str,
+                                  step_size: int, by_folder: bool):
+        class_wsis_info = wsis_info.loc[wsis_info['label'] == class_i]
+        self.produce_patches(wsis_info=class_wsis_info,
+                             partition_name=partition_name,
+                             output_folder=output_folder.joinpath(class_i),
+                             step_size=step_size,
+                             by_folder=by_folder)
+
+    def produce_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
+                        partition_name: str, step_size: int,
+                        by_folder: bool = True) -> None:
         """
         Produce the patches from the WSI in parallel.
 
         Args:
             output_folder: Folder to save the patches to.
-            inverse_overlap_factor: Overlap factor used in patch creation.
-            num_workers: Number of workers to use for IO.
-            patch_size: Size of the patches extracted from the WSI.
-            purple_threshold: Number of purple points for region to be considered purple.
-            purple_scale_size: Scalar to use for reducing image to check for purple.
-            image_ext: Image extension for saving patches.
-            type_histopath: Only look for purple histopathology images and filter whitespace.
+            by_folder: Whether to generate the patches by folder or by image.
         """
-        logging.info(f"Generating {partition_name} evaluation patches...")
-
         output_folder.mkdir(parents=True, exist_ok=True)
         image_paths = wsis_info['path'].tolist()
         outputted_patches = 0
 
         logging.info(f"\ngetting small crops from {len(image_paths)} "
-                     f"images for {partition_name} "
-                     f"with inverse overlap factor {inverse_overlap_factor:.2f} "
+                     f"{partition_name} images "
+                     f"with step size {step_size} "
                      f"outputting in {output_folder}")
 
         start_time = time.time()
-
+        pool = ThreadPool(processes=self._num_workers)
         for image_path in image_paths:
-            image = imread(uri=image_path)
+            num_patches = self._produce_patches_by_image(image_path,
+                                                         output_folder,
+                                                         step_size,
+                                                         by_folder, pool)
+            if by_folder:
+                print(f"{image_path}: num outputted windows: {num_patches}")
+            else:
+                outputted_patches += num_patches
 
-            # Sources:
-            # 1. https://research.wmz.ninja/articles/2018/03/on-sharing-large-arrays-when-using-pythons-multiprocessing.html
-            # 2. https://stackoverflow.com/questions/33247262/the-corresponding-ctypes-type-of-a-numpy-dtype
-            # 3. https://stackoverflow.com/questions/7894791/use-numpy-array-in-shared-memory-for-multiprocessing
-            img = RawArray(
-                typecode_or_type=np.ctypeslib.as_ctypes_type(dtype=image.dtype),
-                size_or_initializer=image.size)
-            img_np = np.frombuffer(buffer=img,
-                                   dtype=image.dtype).reshape(image.shape)
-            np.copyto(dst=img_np, src=image)
+        if not by_folder:
+            logging.info(
+                f"finished {partition_name} patches "
+                f"with step size {step_size} "
+                f"in {time.time() - start_time:.2f} seconds "
+                f"outputting in {output_folder} "
+                f"for {outputted_patches} patches")
 
-            # Number of x starting points.
-            x_steps = int((image.shape[0] - patch_size) / patch_size *
-                          inverse_overlap_factor) + 1
-            # Number of y starting points.
-            y_steps = int((image.shape[1] - patch_size) / patch_size *
-                          inverse_overlap_factor) + 1
-            # Step size, same for x and y.
-            step_size = int(patch_size / inverse_overlap_factor)
+    def _produce_patches_by_image(self, image_path: Path, output_folder: Path,
+                                  step_size: int, by_folder: bool,
+                                  pool: ThreadPool):
+        """
+        Args:
+            output_folder: Folder to save the patches to.
+            by_folder: Whether to generate the patches by folder or by image.
+        """
+        image = imread(uri=image_path)
 
-            # Create the queues for passing data back and forth.
-            in_queue = Queue()
-            out_queue = Queue(maxsize=-1)
+        coords = self._calc_coords(image, step_size)
 
-            # Create the processes for multiprocessing.
-            processes = [
-                Process(target=self._find_patch_mp,
-                        args=(functools.partial(
-                            self._find_patch,
-                            output_folder=output_folder,
-                            image=img_np,
-                            image_loc=Path(image_path),
-                            purple_threshold=purple_threshold,
-                            purple_scale_size=purple_scale_size,
-                            image_ext=image_ext,
-                            type_histopath=type_histopath,
-                            patch_size=patch_size), in_queue, out_queue))
-                for __ in range(num_workers)
-            ]
-            for p in processes:
-                p.daemon = True
-                p.start()
+        patches_found = pool.imap_unordered(functools.partial(
+                                            self._find_patch,
+                                            output_folder=output_folder,
+                                            image=image,
+                                            image_loc=Path(image_path),
+                                            by_folder=by_folder), coords)
+        num_patches = sum([1 for patch_found in patches_found if patch_found])
+        return num_patches
 
-            # Put the (x, y) coordinates in the input queue.
-            for xy in itertools.product(range(0, x_steps * step_size, step_size),
-                                        range(0, y_steps * step_size, step_size)):
-                in_queue.put(obj=xy)
+    def _calc_coords(self, image: np.ndarray,
+                     step_size: int):
+        x_steps = self._count_x_steps(image, step_size)
+        y_steps = self._count_y_steps(image, step_size)
 
-            # Store num_workers None values so the processes exit when not enough jobs left.
-            for __ in range(num_workers):
-                in_queue.put(obj=None)
+        return itertools.product(range(0, x_steps * step_size, step_size),
+                                 range(0, y_steps * step_size, step_size))
 
-            num_patches = sum([out_queue.get() for __ in range(x_steps * y_steps)])
+    def _count_x_steps(self, image: np.ndarray,
+                       step_size: int):
+        return int((image.shape[0] - self._patch_size) / step_size) + 1
 
-            # Join the processes as they finish.
-            for p in processes:
-                p.join(timeout=1)
-
-            outputted_patches += num_patches
-
-        logging.info(
-            f"finished patches for {partition_name} "
-            f"with inverse overlap factor {inverse_overlap_factor:.2f} in {time.time() - start_time:.2f} seconds "
-            f"outputting in {output_folder} "
-            f"for {outputted_patches} patches")
+    def _count_y_steps(self, image: np.ndarray,
+                       step_size: int):
+        return int((image.shape[1] - self._patch_size) / step_size) + 1
 
     def _find_patch(self, xy_start: Tuple[int, int], output_folder: Path,
-                    image: np.ndarray, image_loc: Path,
-                    patch_size: int, image_ext: str, type_histopath: bool,
-                    purple_threshold: int, purple_scale_size: int) -> int:
+                    image: np.ndarray, image_loc: Path, by_folder: bool) -> int:
         """
         Find the patches for a WSI.
 
@@ -203,11 +171,7 @@ class PatchExtractor:
             image: WSI to extract patches from.
             xy_start: Starting coordinates of the patch.
             image_loc: Location of the image to use for creating output filename.
-            patch_size: Size of the patches extracted from the WSI.
-            image_ext: Image extension for saving patches.
-            type_histopath: Only look for purple histopathology images and filter whitespace.
-            purple_threshold: Number of purple points for region to be considered purple.
-            purple_scale_size: Scalar to use for reducing image to check for purple.
+            by_folder: Whether to generate the patches by folder or by image.
 
         Returns:
             The number 1 if the image was saved successfully and a 0 otherwise.
@@ -215,46 +179,42 @@ class PatchExtractor:
         """
         x_start, y_start = xy_start
 
-        patch = image[x_start:x_start + patch_size, y_start:y_start +
-                                                            patch_size, :]
+        patch = image[x_start:x_start + self._patch_size,
+                      y_start:y_start + self._patch_size, :]
         # Sometimes the images are RGBA instead of RGB. Only keep RGB channels.
         patch = patch[..., [0, 1, 2]]
 
-        output_subsubfolder = output_folder.joinpath(
-            Path(image_loc.name).with_suffix(""))
-        output_subsubfolder = output_subsubfolder.joinpath(
-            output_subsubfolder.name)
-        output_subsubfolder.mkdir(parents=True, exist_ok=True)
-        output_path = output_subsubfolder.joinpath(
-            f"{image_loc.stem}_{x_start}_{y_start}.{image_ext}")
+        if by_folder:
+            output_subsubfolder = output_folder.joinpath(image_loc.stem)
+            output_subsubfolder = output_subsubfolder.joinpath(output_subsubfolder.name)
+            output_subsubfolder.mkdir(parents=True, exist_ok=True)
+            output_path = output_subsubfolder.joinpath(
+                f"{image_loc.stem}_{x_start}_{y_start}.{self._image_ext}")
+        else:
+            output_path = output_folder.joinpath(
+                f"{image_loc.stem}_{x_start}_{y_start}.{self._image_ext}")
 
-        if type_histopath:
-            if self._is_purple(crop=patch,
-                               purple_threshold=purple_threshold,
-                               purple_scale_size=purple_scale_size):
+        if self._type_histopath:
+            if self._is_purple(crop=patch):
                 imsave(uri=output_path, im=patch)
             else:
-                return 0
+                return False
         else:
             imsave(uri=output_path, im=patch)
-        return 1
+        return True
 
-    @staticmethod
-    def _is_purple(crop: np.ndarray, purple_threshold: int,
-                   purple_scale_size: int) -> bool:
+    def _is_purple(self, crop: np.ndarray) -> bool:
         """
         Determines if a given portion of an image is purple.
 
         Args:
             crop: Portion of the image to check for being purple.
-            purple_threshold: Number of purple points for region to be considered purple.
-            purple_scale_size: Scalar to use for reducing image to check for purple.
 
         Returns:
             A boolean representing whether the image is purple or not.
         """
-        block_size = (crop.shape[0] // purple_scale_size,
-                      crop.shape[1] // purple_scale_size, 1)
+        block_size = (crop.shape[0] // self._purple_scale_size,
+                      crop.shape[1] // self._purple_scale_size, 1)
         pooled = block_reduce(image=crop, block_size=block_size, func=np.average)
 
         # Calculate boolean arrays for determining if portion is purple.
@@ -267,28 +227,27 @@ class PatchExtractor:
         pooled = pooled[cond1 & cond2 & cond3]
         num_purple = pooled.shape[0]
 
-        return num_purple > purple_threshold
+        return num_purple > self._purple_threshold
 
-    def _calc_class_to_overlap_factor(self, wsi_info: pd.DataFrame, n_patches_per_class: int) -> Dict[Path, float]:
+    def _calc_step_size_by_class(self, wsis_info: pd.DataFrame, n_patches_per_class: int) -> Dict[Path, int]:
         """
-        Find how much the inverse overlap factor should be for each folder so that
+        Find how much the step size should be for each folder so that
         the class distributions are approximately equal.
 
         Args:
             n_patches_per_class: Desired number of patches per class.
 
         Returns:
-            A dictionary mapping classes to inverse overlap factor.
+            A dictionary mapping classes to step size.
         """
-        class_to_overlap_factor = {}
-        classes = wsi_info['label'].unique()
-        for class_i in classes:
-            overlap_factor = self._calc_overlap_factor(class_i, n_patches_per_class, wsi_info)
-            class_to_overlap_factor[class_i] = overlap_factor
+        step_size_by_class = {}
+        for class_i in self._extract_classes(wsis_info):
+            overlap_factor = self._calc_overlap_factor(class_i, n_patches_per_class, wsis_info)
+            step_size_by_class[class_i] = int(self._patch_size / overlap_factor)
+        return step_size_by_class
 
-        return class_to_overlap_factor
-
-    def _calc_overlap_factor(self, class_: str, n_patches_per_class: int, wsi_info: pd.Series) -> float:
+    def _calc_overlap_factor(self, class_: str, n_patches_per_class: int,
+                             wsi_info: pd.DataFrame) -> float:
         """
         Find how much the inverse overlap factor should be for each folder so that
         the class distributions are approximately equal.
@@ -301,10 +260,12 @@ class PatchExtractor:
         """
         wsi_info_i = wsi_info.loc[wsi_info['label'] == class_]
         n_images = self._count_images(wsi_info_i)
-        total_size = self._calc_total_image_size(wsi_info_i)
+        total_images_size = self._calc_total_image_size(wsi_info_i)
         # Each image is 13KB = 0.013MB, idk I just added two randomly.
-        overlap_factor = max(1.0, math.sqrt(n_patches_per_class / (total_size / 0.013)) ** 1.5)
-        logging.info(f"{class_}: {total_size}MB, "
+        patch_size = 0.013
+        min_n_patches_per_class = total_images_size / patch_size
+        overlap_factor = max(1.0, math.sqrt(n_patches_per_class / min_n_patches_per_class) ** 1.5)
+        logging.info(f"{class_}: {total_images_size}MB, "
                      f"{n_images} images, "
                      f"overlap_factor={overlap_factor:.2f}")
         return overlap_factor
@@ -321,7 +282,7 @@ class PatchExtractor:
         return wsi_info['id'].drop_duplicates().shape[0]
 
     @staticmethod
-    def _calc_total_image_size(wsi_info: pd.DataFrame) -> Tuple[int, float]:
+    def _calc_total_image_size(wsi_info: pd.DataFrame) -> float:
         """
         Finds the size of images.
         Used to decide how much to slide windows.
@@ -338,20 +299,5 @@ class PatchExtractor:
         return file_size_mb
 
     @staticmethod
-    def _find_patch_mp(func: Callable[[Tuple[int, int]], int], in_queue: Queue,
-                       out_queue: Queue) -> None:
-        """
-        Find the patches from the WSI using multiprocessing.
-        Helper function to ensure values are sent to each process
-        correctly.
-
-        Args:
-            func: Function to call in multiprocessing.
-            in_queue: Queue containing input data.
-            out_queue: Queue to put output in.
-        """
-        while True:
-            xy = in_queue.get()
-            if xy is None:
-                break
-            out_queue.put(obj=func(xy))
+    def _extract_classes(wsis_info):
+        return wsis_info['label'].unique()

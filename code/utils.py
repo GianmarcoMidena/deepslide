@@ -80,7 +80,7 @@ def extract_subfolder_paths(folder: Path) -> List[Path]:
     ], key=str)
 
 
-def get_all_image_paths(master_folder: Path) -> List[Path]:
+def search_all_image_paths(master_folder: Path) -> List[Path]:
     """
     Finds all image paths in subfolders.
 

@@ -10,7 +10,7 @@ import logging
 
 from .downscaling import downscale
 from .splitting import split
-from .tiling import process_patches
+from .tiling import tile
 from .learning import train
 from .evaluation import test, final_test
 from .grid_searching import grid_search
@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(description="DeepSlide",
 subparsers = parser.add_subparsers(parser_class=ArgumentParser)
 downscale.add_parser(subparsers)
 split.add_parser(subparsers)
-process_patches.add_parser(subparsers)
+tile.add_parser(subparsers)
 train.add_parser(subparsers)
 test.add_parser(subparsers)
 grid_search.add_parser(subparsers)
