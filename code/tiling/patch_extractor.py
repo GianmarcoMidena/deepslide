@@ -1,149 +1,157 @@
 import functools
 import itertools
 import logging
-import math
 import time
+from abc import ABC, abstractmethod
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple, List
 import numpy as np
 import pandas as pd
-from PIL import Image
 from imageio import (imsave, imread)
-from skimage.measure import block_reduce
-
-Image.MAX_IMAGE_PIXELS = None
+from .step_size_calculator import StepSizeCalculator
 
 
-class PatchExtractor:
-    def __init__(self, patch_size: int, purple_threshold: int,
-                 purple_scale_size: int, image_ext: str, type_histopath: bool,
-                 num_workers: int):
+class PatchExtractor(ABC):
+    def __init__(self, patch_size: int, image_ext: str, num_workers: int):
         """
         Args:
-            num_workers: Number of workers to use for IO.
             patch_size: Size of the patches extracted from the WSI.
-            purple_threshold: Number of purple points for region to be considered purple.
-            purple_scale_size: Scalar to use for reducing image to check for purple.
             image_ext: Image extension for saving patches.
-            type_histopath: Only look for purple histopathology images and filter whitespace.
+            num_workers: Number of workers to use for IO.
         """
         self._patch_size = patch_size
-        self._purple_threshold = purple_threshold
-        self._purple_scale_size = purple_scale_size
         self._image_ext = image_ext
-        self._type_histopath = type_histopath
-        self._num_workers = num_workers
+        self._pool = self._create_process_pool(num_workers=num_workers)
 
-    def gen_train_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
-                          n_patches_per_class: int) -> None:
+    def extract_all(self, wsis_info: pd.DataFrame, step_size: int, partition_name: str, output_folder: Path = None,
+                    by_wsi: bool = False) -> int:
         """
-        Generates all patches for classes in the training set.
-
         Args:
             output_folder: Folder to save the patches to.
-            n_patches_per_class: The desired number of training patches per class.
+            by_wsi: Whether to generate the patches by folder or by image.
         """
-        logging.info("Generating training patches...")
-
-        step_size_by_class = self._calc_step_size_by_class(wsis_info=wsis_info,
-                                                           n_patches_per_class=n_patches_per_class)
-
-        for class_i in self._extract_classes(wsis_info):
-            self._produce_patches_by_class(class_i=class_i,
-                                           wsis_info=wsis_info,
-                                           partition_name='training',
-                                           output_folder=output_folder,
-                                           step_size=step_size_by_class[class_i],
-                                           by_folder=False)
-
-    def gen_val_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
-                        step_size: int) -> None:
-        """
-        Generates all validation patches.
-
-        Args:
-            output_folder: Folder to save the patches to.
-        """
-        logging.info("Generating validation patches...")
-
-        for class_i in self._extract_classes(wsis_info):
-            self._produce_patches_by_class(class_i=class_i,
-                                           wsis_info=wsis_info,
-                                           partition_name='validation',
-                                           output_folder=output_folder,
-                                           step_size=step_size,
-                                           by_folder=False)
-
-    def _produce_patches_by_class(self, class_i: str, wsis_info: pd.DataFrame,
-                                  output_folder: Path, partition_name: str,
-                                  step_size: int, by_folder: bool):
-        class_wsis_info = wsis_info.loc[wsis_info['label'] == class_i]
-        self.produce_patches(wsis_info=class_wsis_info,
-                             partition_name=partition_name,
-                             output_folder=output_folder.joinpath(class_i),
-                             step_size=step_size,
-                             by_folder=by_folder)
-
-    def produce_patches(self, wsis_info: pd.DataFrame, output_folder: Path,
-                        partition_name: str, step_size: int,
-                        by_folder: bool = True) -> None:
-        """
-        Produce the patches from the WSI in parallel.
-
-        Args:
-            output_folder: Folder to save the patches to.
-            by_folder: Whether to generate the patches by folder or by image.
-        """
-        output_folder.mkdir(parents=True, exist_ok=True)
-        image_paths = wsis_info['path'].tolist()
-        outputted_patches = 0
+        image_paths = self._search_image_paths(wsis_info)
 
         logging.info(f"\ngetting small crops from {len(image_paths)} "
                      f"{partition_name} images "
                      f"with step size {step_size} "
                      f"outputting in {output_folder}")
 
+        total_patches_found = 0
         start_time = time.time()
-        pool = ThreadPool(processes=self._num_workers)
         for image_path in image_paths:
-            num_patches = self._produce_patches_by_image(image_path,
-                                                         output_folder,
-                                                         step_size,
-                                                         by_folder, pool)
-            if by_folder:
-                print(f"{image_path}: num outputted windows: {num_patches}")
-            else:
-                outputted_patches += num_patches
+            total_patches_found += self._extract_all_from_image(image_path=image_path, step_size=step_size,
+                                                                output_folder=output_folder, by_wsi=by_wsi)
 
-        if not by_folder:
+        if not by_wsi:
             logging.info(
                 f"finished {partition_name} patches "
                 f"with step size {step_size} "
                 f"in {time.time() - start_time:.2f} seconds "
                 f"outputting in {output_folder} "
-                f"for {outputted_patches} patches")
+                f"for {total_patches_found} patches")
 
-    def _produce_patches_by_image(self, image_path: Path, output_folder: Path,
-                                  step_size: int, by_folder: bool,
-                                  pool: ThreadPool):
+        return total_patches_found
+
+    def extract_all_by_class(self, wsis_info: pd.DataFrame, partition_name: str, output_folder: Path,
+                             n_patches_per_class: int = None, step_size: int = None):
         """
         Args:
             output_folder: Folder to save the patches to.
-            by_folder: Whether to generate the patches by folder or by image.
+        """
+        for class_name in self._extract_classes(wsis_info):
+            self._extract_all_from_class(class_name=class_name, wsis_info=wsis_info, partition_name=partition_name,
+                                         output_folder=output_folder, n_patches_per_class=n_patches_per_class,
+                                         step_size=step_size)
+
+    def _extract_all_from_class(self, class_name: str, wsis_info: pd.DataFrame, partition_name: str, output_folder: Path,
+                                n_patches_per_class: int = None, step_size: int = None):
+        class_wsis_info = wsis_info.loc[wsis_info['label'] == class_name]
+        if step_size is None:
+            step_size = self._calc_class_step_size(class_name=class_name,
+                                                   wsis_info=wsis_info,
+                                                   n_patches_per_class=n_patches_per_class)
+        self.extract_all(wsis_info=class_wsis_info, step_size=step_size, partition_name=partition_name,
+                         output_folder=output_folder.joinpath(class_name))
+
+    def _extract_all_from_image(self, image_path: Path, step_size: int, output_folder: Path = None,
+                                by_wsi: bool = False) -> int:
+        """
+        Args:
+            output_folder: Folder to save the patches to.
+            by_wsi: Whether to generate the patches by folder or by image.
         """
         image = imread(uri=image_path)
 
         coords = self._calc_coords(image, step_size)
 
-        patches_found = pool.imap_unordered(functools.partial(
-                                            self._find_patch,
-                                            output_folder=output_folder,
-                                            image=image,
-                                            image_loc=Path(image_path),
-                                            by_folder=by_folder), coords)
+        patches_found = self._pool.imap_unordered(
+            functools.partial(
+                self._extract_one_from_coords,
+                output_folder=output_folder,
+                image=image,
+                image_loc=image_path,
+                by_wsi=by_wsi),
+            coords)
         num_patches = sum([1 for patch_found in patches_found if patch_found])
+        if by_wsi:
+            logging.info(f"{image_path}: num outputted windows: {num_patches}")
         return num_patches
+
+    def _extract_one_from_coords(self, xy_start: Tuple[int, int], image: np.ndarray, image_loc: Path,
+                                 output_folder: Path = None, by_wsi: bool = False) -> int:
+        """
+        Args:
+            output_folder: Folder to save the patches to.
+            image: WSI to extract patches from.
+            xy_start: Starting coordinates of the patch.
+            image_loc: Location of the image to use for creating output filename.
+            by_wsi: Whether to generate the patches by folder or by image.
+
+        Returns:
+            The number 1 if the image was saved successfully and a 0 otherwise.
+            Used to determine the number of patches produced per WSI.
+        """
+        x_start, y_start = xy_start
+
+        patch = image[x_start:x_start + self._patch_size,
+                      y_start:y_start + self._patch_size, :]
+        # Sometimes the images are RGBA instead of RGB. Only keep RGB channels.
+        patch = patch[..., [0, 1, 2]]
+
+        if self.check_patch(crop=patch):
+            if output_folder is not None:
+                self._save_patch(patch=patch, x_start=x_start, y_start=y_start, image_name=image_loc.stem,
+                                 output_folder=output_folder, by_wsi=by_wsi)
+            return True
+        return False
+
+    @abstractmethod
+    def check_patch(self, crop: np.ndarray) -> bool:
+        """
+        Determines if a given portion of an image is an admissible patch.
+
+        Args:
+            crop: Portion of the image to check for being an admissible patch.
+
+        Returns:
+            A boolean representing whether the image is an admissible patch or not.
+        """
+
+    def _save_patch(self, patch: np.ndarray, x_start: int, y_start: int, image_name: str, output_folder: Path,
+                    by_wsi: bool = False):
+        output_folder.mkdir(parents=True, exist_ok=True)
+        if by_wsi:
+            output_subsubfolder = output_folder.joinpath(image_name)
+            output_subsubfolder = output_subsubfolder.joinpath(output_subsubfolder.name)
+            output_subsubfolder.mkdir(parents=True, exist_ok=True)
+            output_path = output_subsubfolder.joinpath(
+                f"{image_name}_{x_start}_{y_start}.{self._image_ext}")
+        else:
+            output_path = output_folder.joinpath(
+                f"{image_name}_{x_start}_{y_start}.{self._image_ext}")
+        imsave(uri=output_path, im=patch)
 
     def _calc_coords(self, image: np.ndarray,
                      step_size: int):
@@ -161,143 +169,24 @@ class PatchExtractor:
                        step_size: int):
         return int((image.shape[1] - self._patch_size) / step_size) + 1
 
-    def _find_patch(self, xy_start: Tuple[int, int], output_folder: Path,
-                    image: np.ndarray, image_loc: Path, by_folder: bool) -> int:
-        """
-        Find the patches for a WSI.
-
-        Args:
-            output_folder: Folder to save the patches to.
-            image: WSI to extract patches from.
-            xy_start: Starting coordinates of the patch.
-            image_loc: Location of the image to use for creating output filename.
-            by_folder: Whether to generate the patches by folder or by image.
-
-        Returns:
-            The number 1 if the image was saved successfully and a 0 otherwise.
-            Used to determine the number of patches produced per WSI.
-        """
-        x_start, y_start = xy_start
-
-        patch = image[x_start:x_start + self._patch_size,
-                      y_start:y_start + self._patch_size, :]
-        # Sometimes the images are RGBA instead of RGB. Only keep RGB channels.
-        patch = patch[..., [0, 1, 2]]
-
-        if by_folder:
-            output_subsubfolder = output_folder.joinpath(image_loc.stem)
-            output_subsubfolder = output_subsubfolder.joinpath(output_subsubfolder.name)
-            output_subsubfolder.mkdir(parents=True, exist_ok=True)
-            output_path = output_subsubfolder.joinpath(
-                f"{image_loc.stem}_{x_start}_{y_start}.{self._image_ext}")
-        else:
-            output_path = output_folder.joinpath(
-                f"{image_loc.stem}_{x_start}_{y_start}.{self._image_ext}")
-
-        if self._type_histopath:
-            if self._is_purple(crop=patch):
-                imsave(uri=output_path, im=patch)
-            else:
-                return False
-        else:
-            imsave(uri=output_path, im=patch)
-        return True
-
-    def _is_purple(self, crop: np.ndarray) -> bool:
-        """
-        Determines if a given portion of an image is purple.
-
-        Args:
-            crop: Portion of the image to check for being purple.
-
-        Returns:
-            A boolean representing whether the image is purple or not.
-        """
-        block_size = (crop.shape[0] // self._purple_scale_size,
-                      crop.shape[1] // self._purple_scale_size, 1)
-        pooled = block_reduce(image=crop, block_size=block_size, func=np.average)
-
-        # Calculate boolean arrays for determining if portion is purple.
-        r, g, b = pooled[..., 0], pooled[..., 1], pooled[..., 2]
-        cond1 = r > g - 10
-        cond2 = b > g - 10
-        cond3 = ((r + b) / 2) > g + 20
-
-        # Find the indexes of pooled satisfying all 3 conditions.
-        pooled = pooled[cond1 & cond2 & cond3]
-        num_purple = pooled.shape[0]
-
-        return num_purple > self._purple_threshold
-
-    def _calc_step_size_by_class(self, wsis_info: pd.DataFrame, n_patches_per_class: int) -> Dict[Path, int]:
-        """
-        Find how much the step size should be for each folder so that
-        the class distributions are approximately equal.
-
-        Args:
-            n_patches_per_class: Desired number of patches per class.
-
-        Returns:
-            A dictionary mapping classes to step size.
-        """
-        step_size_by_class = {}
-        for class_i in self._extract_classes(wsis_info):
-            overlap_factor = self._calc_overlap_factor(class_i, n_patches_per_class, wsis_info)
-            step_size_by_class[class_i] = int(self._patch_size / overlap_factor)
-        return step_size_by_class
-
-    def _calc_overlap_factor(self, class_: str, n_patches_per_class: int,
-                             wsi_info: pd.DataFrame) -> float:
-        """
-        Find how much the inverse overlap factor should be for each folder so that
-        the class distributions are approximately equal.
-
-        Args:
-            n_patches_per_class: Desired number of patches per class.
-
-        Returns:
-            A dictionary mapping classes to inverse overlap factor.
-        """
-        wsi_info_i = wsi_info.loc[wsi_info['label'] == class_]
-        n_images = self._count_images(wsi_info_i)
-        total_images_size = self._calc_total_image_size(wsi_info_i)
-        # Each image is 13KB = 0.013MB, idk I just added two randomly.
-        patch_size = 0.013
-        min_n_patches_per_class = total_images_size / patch_size
-        overlap_factor = max(1.0, math.sqrt(n_patches_per_class / min_n_patches_per_class) ** 1.5)
-        logging.info(f"{class_}: {total_images_size}MB, "
-                     f"{n_images} images, "
-                     f"overlap_factor={overlap_factor:.2f}")
-        return overlap_factor
+    def _calc_class_step_size(self, class_name: str, wsis_info: pd.DataFrame,
+                              n_patches_per_class: int) -> int:
+        return StepSizeCalculator(patch_size=self._patch_size,
+                                  n_patches_per_class=n_patches_per_class,
+                                  wsis_info=wsis_info) \
+               .calc_class_step_size(class_name)
 
     @staticmethod
-    def _count_images(wsi_info: pd.DataFrame) -> Tuple[int, float]:
+    def _create_process_pool(num_workers: int):
         """
-        Finds the number of images.
-        Used to decide how much to slide windows.
-
-        Returns:
-            A tuple containing the total size of the images and the number of images.
+        Args:
+            num_workers: Number of workers to use for IO.
         """
-        return wsi_info['id'].drop_duplicates().shape[0]
-
-    @staticmethod
-    def _calc_total_image_size(wsi_info: pd.DataFrame) -> float:
-        """
-        Finds the size of images.
-        Used to decide how much to slide windows.
-
-        Returns:
-            A tuple containing the total size of the images and the number of images.
-        """
-        file_size = 0
-        image_paths = wsi_info['path'].tolist()
-        for image_path in image_paths:
-            file_size += Path(image_path).stat().st_size
-
-        file_size_mb = file_size / 1e6
-        return file_size_mb
+        return ThreadPool(processes=num_workers)
 
     @staticmethod
     def _extract_classes(wsis_info):
         return wsis_info['label'].unique()
+
+    def _search_image_paths(self, wsis_info: pd.DataFrame) -> List[Path]:
+        return wsis_info['path'].apply(Path).tolist()

@@ -163,15 +163,6 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Target number of learning samples per class")
         return self
 
-    def with_type_histopath(self):
-        # Only looks for purple images and filters whitespace.
-        self.add_argument(
-            "--type_histopath",
-            type=bool,
-            default=True,
-            help="Only look for purple histopathology images and filter whitespace")
-        return self
-
     def with_purple_threshold(self):
         # Number of purple points for region to be considered purple.
         self.add_argument(

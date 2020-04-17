@@ -2,20 +2,19 @@ import logging
 
 import pandas as pd
 
-from .class_balancer import ClassBalancer
-from .patch_extractor import PatchExtractor
+from .patches_balancer import PatchesBalancer
+from .purple_patch_extractor import PurplePatchExtractor
 from ..configurer import Configurer
 
 
 def tile(args):
     args = Configurer(args).build()
 
-    patch_extractor = PatchExtractor(patch_size=args.patch_size,
-                                     num_workers=args.num_workers,
-                                     purple_threshold=args.purple_threshold,
-                                     purple_scale_size=args.purple_scale_size,
-                                     image_ext=args.image_ext,
-                                     type_histopath=args.type_histopath)
+    patch_extractor = PurplePatchExtractor(patch_size=args.patch_size,
+                                           purple_threshold=args.purple_threshold,
+                                           purple_scale_size=args.purple_scale_size,
+                                           image_ext=args.image_ext,
+                                           num_workers=args.num_workers)
 
     train_wsis_info = pd.read_csv(args.wsis_train)
     val_wsis_info = pd.read_csv(args.wsis_val)
@@ -28,27 +27,24 @@ def tile(args):
     val_step_size = int(args.patch_size / args.val_patch_overlap_factor)
     test_step_size = int(args.patch_size / args.test_patch_overlap_factor)
 
-    patch_extractor.gen_train_patches(wsis_info=train_wsis_info,
-                                      output_folder=train_patches,
-                                      n_patches_per_class=args.num_train_patches_per_class)
+    logging.info("Generating training patches...")
+    patch_extractor.extract_all_by_class(wsis_info=train_wsis_info, partition_name='training',
+                                         output_folder=train_patches,
+                                         n_patches_per_class=args.num_train_patches_per_class)
 
-    ClassBalancer(image_dir=train_patches, partition_name='training').balance()
+    PatchesBalancer(image_dir=train_patches, partition_name='training').balance_by_class()
 
-    patch_extractor.gen_val_patches(wsis_info=val_wsis_info,
-                                    output_folder=val_patches,
-                                    step_size=val_step_size)
+    logging.info("Generating validation patches...")
+    patch_extractor.extract_all_by_class(wsis_info=val_wsis_info, partition_name='validation',
+                                         output_folder=val_patches, step_size=val_step_size)
 
     logging.info(f"Generating validation evaluation patches...")
-    patch_extractor.produce_patches(wsis_info=val_wsis_info,
-                                    partition_name='validation',
-                                    output_folder=args.patches_eval_val,
-                                    step_size=test_step_size)
+    patch_extractor.extract_all(wsis_info=val_wsis_info, step_size=test_step_size, partition_name='validation',
+                                output_folder=args.patches_eval_val, by_wsi=True)
 
     logging.info(f"Generating test evaluation patches...")
-    patch_extractor.produce_patches(wsis_info=test_wsis_info,
-                                    partition_name='test',
-                                    output_folder=args.patches_eval_test,
-                                    step_size=test_step_size)
+    patch_extractor.extract_all(wsis_info=test_wsis_info, step_size=test_step_size, partition_name='test',
+                                output_folder=args.patches_eval_test, by_wsi=True)
 
 
 def add_parser(subparsers):
@@ -63,7 +59,6 @@ def add_parser(subparsers):
         .with_purple_threshold() \
         .with_purple_scale_size() \
         .with_image_ext() \
-        .with_type_histopath() \
         .with_val_patch_overlap_factor() \
         .with_patches_eval_val() \
         .with_patches_eval_test() \

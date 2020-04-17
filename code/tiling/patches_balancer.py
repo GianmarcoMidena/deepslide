@@ -7,7 +7,7 @@ import pandas as pd
 from code.utils import extract_subfolder_paths, search_image_paths, search_all_image_paths
 
 
-class ClassBalancer:
+class PatchesBalancer:
     """
     Balancing class distribution.
     """
@@ -16,7 +16,7 @@ class ClassBalancer:
         self._partition_name = partition_name
         self._patches_info = None
 
-    def balance(self) -> None:
+    def balance_by_class(self) -> None:
         logging.info(f"Balancing the {self._partition_name} patches...")
 
         self._patches_info = self._extract_patches_info()
@@ -24,7 +24,7 @@ class ClassBalancer:
         biggest_class_size = self._count_the_biggest_class_items()
 
         for class_i in self._extract_classes():
-            self._balance_by_class(class_i, biggest_class_size)
+            self._balance_class(class_i, biggest_class_size)
 
         logging.info(f"balanced all {self._partition_name} classes to have {biggest_class_size} images\n")
 
@@ -34,8 +34,8 @@ class ClassBalancer:
                           for subfolder in subfolders],
                          ignore_index=True, sort=False)
 
-    def _balance_by_class(self, class_i: str, biggest_class_size: int):
-        class_i_image_paths = self._search_image_paths_by_class(class_i)
+    def _balance_class(self, class_i: str, biggest_class_size: int):
+        class_i_image_paths = self._search_class_image_paths(class_i)
         n_lacking_images = biggest_class_size - len(class_i_image_paths)
         self._duplicate(image_paths=class_i_image_paths,
                         n_duplicates=n_lacking_images)
@@ -49,7 +49,7 @@ class ClassBalancer:
     def _extract_classes(self):
         return self._patches_info['label'].unique()
 
-    def _search_image_paths_by_class(self, class_i: str):
+    def _search_class_image_paths(self, class_i: str):
         return self._patches_info.loc[self._patches_info['label'] == class_i, 'path'].apply(Path).tolist()
 
     @staticmethod
