@@ -1,3 +1,4 @@
+import logging
 import time
 from pathlib import Path
 from typing import (Dict, IO, List)
@@ -92,10 +93,10 @@ class Learner:
         }
         dataset_sizes = {x: len(image_datasets[x]) for x in ("train", "val")}
 
-        print(f"{self._num_classes} classes: {self._classes}\n"
-              f"num train images {len(dataloaders['train']) * self._batch_size}\n"
-              f"num val images {len(dataloaders['val']) * self._batch_size}\n"
-              f"CUDA is_available: {torch.cuda.is_available()}")
+        logging.info(f"{self._num_classes} classes: {self._classes}\n"
+                     f"num train images {len(dataloaders['train']) * self._batch_size}\n"
+                     f"num val images {len(dataloaders['val']) * self._batch_size}\n"
+                     f"CUDA is_available: {torch.cuda.is_available()}")
 
         model = resnet(num_classes=self._num_classes,
                        num_layers=self._num_layers,
@@ -114,7 +115,7 @@ class Learner:
             optimizer.load_state_dict(state_dict=ckpt["optimizer_state_dict"])
             scheduler.load_state_dict(state_dict=ckpt["scheduler_state_dict"])
             start_epoch = ckpt["epoch"]
-            print(f"model loaded from {self._resume_checkpoint_path}")
+            logging.info(f"model loaded from {self._resume_checkpoint_path}")
         else:
             start_epoch = 0
 
@@ -137,7 +138,8 @@ class Learner:
                                start_epoch=start_epoch,
                                writer=writer)
 
-    def _calculate_confusion_matrix(self, all_labels: np.ndarray,
+    @staticmethod
+    def _calculate_confusion_matrix(all_labels: np.ndarray,
                                     all_predicts: np.ndarray, classes: List[str],
                                     num_classes: int) -> None:
         """
@@ -170,7 +172,7 @@ class Learner:
         cm = pd.crosstab(index=actual, columns=predicted, normalize="index", dropna=False)
 
         cm.style.hide_index()
-        print(cm)
+        logging.info(cm)
 
     def _get_data_transforms(self) -> Dict[str, torchvision.transforms.Compose]:
         """
@@ -203,20 +205,20 @@ class Learner:
         """
         Print the configuration of the model.
         """
-        print(f"train_folder: {self._train_folder}\n"
-              f"num_epochs: {self._num_epochs}\n"
-              f"num_layers: {self._num_layers}\n"
-              f"learning_rate: {self._learning_rate}\n"
-              f"batch_size: {self._batch_size}\n"
-              f"weight_decay: {self._weight_decay}\n"
-              f"learning_rate_decay: {self._learning_rate_decay}\n"
-              f"resume_checkpoint: {self._resume_checkpoint}\n"
-              f"resume_checkpoint_path (only if resume_checkpoint is true): "
-              f"{self._resume_checkpoint_path}\n"
-              f"save_interval: {self._save_interval}\n"
-              f"output in checkpoints_folder: {self._checkpoints_folder}\n"
-              f"pretrain: {self._pretrain}\n"
-              f"log_csv: {self._log_csv}\n\n")
+        logging.info(f"train_folder: {self._train_folder}\n"
+                     f"num_epochs: {self._num_epochs}\n"
+                     f"num_layers: {self._num_layers}\n"
+                     f"learning_rate: {self._learning_rate}\n"
+                     f"batch_size: {self._batch_size}\n"
+                     f"weight_decay: {self._weight_decay}\n"
+                     f"learning_rate_decay: {self._learning_rate_decay}\n"
+                     f"resume_checkpoint: {self._resume_checkpoint}\n"
+                     f"resume_checkpoint_path (only if resume_checkpoint is true): "
+                     f"{self._resume_checkpoint_path}\n"
+                     f"save_interval: {self._save_interval}\n"
+                     f"output in checkpoints_folder: {self._checkpoints_folder}\n"
+                     f"pretrain: {self._pretrain}\n"
+                     f"log_csv: {self._log_csv}\n\n")
 
     def _train_helper(self, model: torchvision.models.resnet.ResNet,
                       dataloaders: Dict[str, torch.utils.data.DataLoader],
@@ -365,13 +367,13 @@ class Learner:
                          f"{train_acc:.4f},{val_loss:.4f},{val_acc:.4f}\n")
 
             # Print the diagnostics for each epoch.
-            print(f"Epoch {epoch} with lr "
-                  f"{current_lr:.15f}: "
-                  f"t_loss: {train_loss:.4f} "
-                  f"t_acc: {train_acc:.4f} "
-                  f"v_loss: {val_loss:.4f} "
-                  f"v_acc: {val_acc:.4f}\n")
+            logging.info(f"Epoch {epoch} with lr "
+                         f"{current_lr:.15f}: "
+                         f"t_loss: {train_loss:.4f} "
+                         f"t_acc: {train_acc:.4f} "
+                         f"v_loss: {val_loss:.4f} "
+                         f"v_acc: {val_acc:.4f}\n")
 
         # Print learning information at the end.
-        print(f"\nlearning complete in "
-              f"{(time.time() - since) // 60:.2f} minutes")
+        logging.info(f"\nlearning complete in "
+                     f"{(time.time() - since) // 60:.2f} minutes")

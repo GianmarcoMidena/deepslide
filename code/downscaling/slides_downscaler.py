@@ -5,9 +5,9 @@ from pathlib import Path
 
 import PIL
 from PIL import Image
-from openslide import OpenSlide, OpenSlideError
+from openslide import OpenSlide
 
-from code.utils import search_image_paths, extract_subfolder_paths
+from code.utils import search_folder_image_paths, extract_subfolder_paths
 
 
 class SlidesDownscaler:
@@ -26,7 +26,7 @@ class SlidesDownscaler:
     def downscale(self):
         slide_paths = self._search_slide_paths_for_downscaling()
         tot_slides_to_downscale = len(slide_paths)
-        print(f"{tot_slides_to_downscale} slides to downscale")
+        logging.info(f"{tot_slides_to_downscale} slides to downscale")
         pool = ThreadPool(processes=self._num_workers)
         n_downscaled_slides = 0
         n_discarded_slides = 0
@@ -43,7 +43,7 @@ class SlidesDownscaler:
         class_paths = extract_subfolder_paths(self._original_wsis_root)
         slide_paths = []
         for class_path in class_paths:
-            slide_paths += search_image_paths(class_path)
+            slide_paths += search_folder_image_paths(class_path)
         return [p for p in slide_paths if not self._is_downscaled(p)]
 
     def _downscale_slide(self, slide_path: Path) -> bool:

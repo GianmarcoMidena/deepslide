@@ -3,7 +3,7 @@ from pathlib import Path
 from glob import glob
 import pandas as pd
 from typing import List
-from code.utils import search_image_paths, extract_subfolder_paths
+from code.utils import search_folder_image_paths, extract_subfolder_paths
 
 
 class WSISplitter:
@@ -85,7 +85,7 @@ class WSISplitter:
         self._report_splits(train_image_paths, val_image_paths, test_image_paths)
 
     def _split_per_class(self, class_path):
-        class_image_paths = search_image_paths(class_path)
+        class_image_paths = search_folder_image_paths(class_path)
         self._check_n_slides_per_class(class_image_paths)
 
         train_image_paths, val_image_paths, test_image_paths = self._split_train_val_test_images(class_image_paths)

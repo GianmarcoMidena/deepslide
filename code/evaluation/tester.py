@@ -8,7 +8,7 @@ import torch
 from torch import nn
 from torchvision import datasets, transforms
 
-from code.utils import extract_subfolder_paths, search_image_paths
+from code.utils import extract_subfolder_paths, search_folder_image_paths
 from code.models import resnet
 
 
@@ -88,7 +88,7 @@ class Tester:
 
         # Load the image names so we know the coordinates of the patches we are predicting.
         patches_dir_path = patches_dir_path.joinpath(patches_dir_path.name)
-        window_names = pd.Series(search_image_paths(folder=patches_dir_path))
+        window_names = pd.Series(search_folder_image_paths(folder=patches_dir_path))
 
         logging.info(f"testing on {num_test_image_windows} crops from {patches_dir_path}")
 
@@ -141,7 +141,7 @@ class Tester:
         """
         return max({
                        model: self._parse_val_acc(model_path=model)
-                       for model in search_image_paths(folder=checkpoints_folder)
+                       for model in search_folder_image_paths(folder=checkpoints_folder)
                    }.items(),
                    key=operator.itemgetter(1))[0]
 

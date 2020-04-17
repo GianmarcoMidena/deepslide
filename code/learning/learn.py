@@ -3,7 +3,7 @@ from code.learning.learner import Learner
 from code.utils import get_log_csv_name
 
 
-def train(args):
+def learn(args):
     args = Configurer(args).with_device() \
         .with_classes() \
         .with_num_classes() \
@@ -64,4 +64,4 @@ def add_parser(subparsers):
         .with_checkpoints_folder() \
         .with_log_folder() \
         .with_image_ext() \
-        .set_defaults(func=train)
+        .set_defaults(func=learn)

@@ -47,7 +47,7 @@ def get_log_csv_name(log_folder: Path) -> Path:
                                f"_{now.hour}{now.minute}{now.second}.csv")
 
 
-def search_image_paths(folder: Path) -> List[Path]:
+def search_folder_image_paths(folder: Path) -> List[Path]:
     """
     Find the full paths of the images in a folder.
 
@@ -94,9 +94,9 @@ def search_all_image_paths(master_folder: Path) -> List[Path]:
     subfolders = extract_subfolder_paths(folder=master_folder)
     if len(subfolders) > 1:
         for subfolder in subfolders:
-            all_paths += search_image_paths(folder=subfolder)
+            all_paths += search_folder_image_paths(folder=subfolder)
     else:
-        all_paths = search_image_paths(folder=master_folder)
+        all_paths = search_folder_image_paths(folder=master_folder)
     return all_paths
 
 
