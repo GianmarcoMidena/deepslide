@@ -8,7 +8,7 @@ from .patch_extractor import PatchExtractor
 class PurplePatchExtractor(PatchExtractor):
     def __init__(self, patch_size: int, purple_threshold: int,
                  purple_scale_size: int, image_ext: str,
-                 num_workers: int):
+                 num_workers: int, logging_level=None):
         """
         Args:
             patch_size: Size of the patches extracted from the WSI.
@@ -17,7 +17,9 @@ class PurplePatchExtractor(PatchExtractor):
             image_ext: Image extension for saving patches.
             num_workers: Number of workers to use for IO.
         """
-        super().__init__(patch_size, image_ext, num_workers)
+        super().__init__(patch_size=patch_size, image_ext=image_ext,
+                         num_workers=num_workers,
+                         logging_level=logging_level)
         self._purple_threshold = purple_threshold
         self._purple_scale_size = purple_scale_size
 

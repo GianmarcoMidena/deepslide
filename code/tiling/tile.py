@@ -1,9 +1,11 @@
 import logging
-
+from pathlib import Path
+from typing import List
 import pandas as pd
 
 from .patches_balancer import PatchesBalancer
 from .purple_patch_extractor import PurplePatchExtractor
+from .step_size_finder import StepSizeFinder
 from ..configurer import Configurer
 
 
@@ -28,9 +30,12 @@ def tile(args):
     test_step_size = int(args.patch_size / args.test_patch_overlap_factor)
 
     logging.info("Generating training patches...")
+    step_size_finder = StepSizeFinder(target_n_patches=args.num_train_patches_per_class,
+                                      patch_size=args.patch_size,
+                                      patch_extractor=patch_extractor)
     patch_extractor.extract_all_by_class(wsis_info=train_wsis_info, partition_name='training',
                                          output_folder=train_patches,
-                                         n_patches_per_class=args.num_train_patches_per_class)
+                                         step_size_finder=step_size_finder)
 
     PatchesBalancer(image_dir=train_patches, partition_name='training').balance_by_class()
 
@@ -39,12 +44,12 @@ def tile(args):
                                          output_folder=val_patches, step_size=val_step_size)
 
     logging.info(f"Generating validation evaluation patches...")
-    patch_extractor.extract_all(wsis_info=val_wsis_info, step_size=test_step_size, partition_name='validation',
-                                output_folder=args.patches_eval_val, by_wsi=True)
+    patch_extractor.extract_all(image_paths=_extract_image_paths(val_wsis_info), step_size=test_step_size,
+                                partition_name='validation', output_folder=args.patches_eval_val, by_wsi=True)
 
     logging.info(f"Generating test evaluation patches...")
-    patch_extractor.extract_all(wsis_info=test_wsis_info, step_size=test_step_size, partition_name='test',
-                                output_folder=args.patches_eval_test, by_wsi=True)
+    patch_extractor.extract_all(image_paths=_extract_image_paths(test_wsis_info), step_size=test_step_size,
+                                partition_name='test', output_folder=args.patches_eval_test, by_wsi=True)
 
 
 def add_parser(subparsers):
@@ -64,3 +69,7 @@ def add_parser(subparsers):
         .with_patches_eval_test() \
         .with_test_patch_overlap_factor() \
         .set_defaults(func=tile)
+
+
+def _extract_image_paths(wsis_info: pd.DataFrame) -> List[Path]:
+    return wsis_info['path'].apply(Path).tolist()

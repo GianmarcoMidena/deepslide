@@ -9,11 +9,12 @@ from typing import Tuple, List
 import numpy as np
 import pandas as pd
 from imageio import (imsave, imread)
-from .step_size_calculator import StepSizeCalculator
+from .step_size_finder import StepSizeFinder
 
 
 class PatchExtractor(ABC):
-    def __init__(self, patch_size: int, image_ext: str, num_workers: int):
+    def __init__(self, patch_size: int, image_ext: str, num_workers: int,
+                 logging_level=None):
         """
         Args:
             patch_size: Size of the patches extracted from the WSI.
@@ -23,20 +24,22 @@ class PatchExtractor(ABC):
         self._patch_size = patch_size
         self._image_ext = image_ext
         self._pool = self._create_process_pool(num_workers=num_workers)
+        self._logger = logging.getLogger(f"patch_extractor_{id(self)}")
+        if logging_level is None:
+            logging_level = logging.INFO
+        self._logger.setLevel(logging_level)
 
-    def extract_all(self, wsis_info: pd.DataFrame, step_size: int, partition_name: str, output_folder: Path = None,
+    def extract_all(self, image_paths: List[Path], step_size: int, partition_name: str, output_folder: Path = None,
                     by_wsi: bool = False) -> int:
         """
         Args:
             output_folder: Folder to save the patches to.
             by_wsi: Whether to generate the patches by folder or by image.
         """
-        image_paths = self._search_image_paths(wsis_info)
-
-        logging.info(f"\ngetting small crops from {len(image_paths)} "
-                     f"{partition_name} images "
-                     f"with step size {step_size} "
-                     f"outputting in {output_folder}")
+        self._logger.info(f"\ngetting small crops from {len(image_paths)} "
+                          f"{partition_name} images "
+                          f"with step size {step_size} "
+                          f"outputting in {output_folder}")
 
         total_patches_found = 0
         start_time = time.time()
@@ -45,7 +48,7 @@ class PatchExtractor(ABC):
                                                                 output_folder=output_folder, by_wsi=by_wsi)
 
         if not by_wsi:
-            logging.info(
+            self._logger.info(
                 f"finished {partition_name} patches "
                 f"with step size {step_size} "
                 f"in {time.time() - start_time:.2f} seconds "
@@ -55,24 +58,25 @@ class PatchExtractor(ABC):
         return total_patches_found
 
     def extract_all_by_class(self, wsis_info: pd.DataFrame, partition_name: str, output_folder: Path,
-                             n_patches_per_class: int = None, step_size: int = None):
+                             step_size: int = None, step_size_finder: StepSizeFinder = None):
         """
         Args:
             output_folder: Folder to save the patches to.
         """
         for class_name in self._extract_classes(wsis_info):
             self._extract_all_from_class(class_name=class_name, wsis_info=wsis_info, partition_name=partition_name,
-                                         output_folder=output_folder, n_patches_per_class=n_patches_per_class,
-                                         step_size=step_size)
+                                         output_folder=output_folder,
+                                         step_size=step_size, step_size_finder=step_size_finder)
 
-    def _extract_all_from_class(self, class_name: str, wsis_info: pd.DataFrame, partition_name: str, output_folder: Path,
-                                n_patches_per_class: int = None, step_size: int = None):
+    def _extract_all_from_class(self, class_name: str, wsis_info: pd.DataFrame, partition_name: str,
+                                output_folder: Path, step_size: int = None,
+                                step_size_finder: StepSizeFinder = None):
         class_wsis_info = wsis_info.loc[wsis_info['label'] == class_name]
+        class_image_paths = self._search_image_paths(class_wsis_info)
         if step_size is None:
-            step_size = self._calc_class_step_size(class_name=class_name,
-                                                   wsis_info=wsis_info,
-                                                   n_patches_per_class=n_patches_per_class)
-        self.extract_all(wsis_info=class_wsis_info, step_size=step_size, partition_name=partition_name,
+            step_size = self._calc_class_step_size(image_paths=class_image_paths,
+                                                   step_size_finder=step_size_finder)
+        self.extract_all(image_paths=class_image_paths, step_size=step_size, partition_name=partition_name,
                          output_folder=output_folder.joinpath(class_name))
 
     def _extract_all_from_image(self, image_path: Path, step_size: int, output_folder: Path = None,
@@ -96,7 +100,7 @@ class PatchExtractor(ABC):
             coords)
         num_patches = sum([1 for patch_found in patches_found if patch_found])
         if by_wsi:
-            logging.info(f"{image_path}: num outputted windows: {num_patches}")
+            self._logger.info(f"{image_path}: num outputted windows: {num_patches}")
         return num_patches
 
     def _extract_one_from_coords(self, xy_start: Tuple[int, int], image: np.ndarray, image_loc: Path,
@@ -169,12 +173,9 @@ class PatchExtractor(ABC):
                        step_size: int):
         return int((image.shape[1] - self._patch_size) / step_size) + 1
 
-    def _calc_class_step_size(self, class_name: str, wsis_info: pd.DataFrame,
-                              n_patches_per_class: int) -> int:
-        return StepSizeCalculator(patch_size=self._patch_size,
-                                  n_patches_per_class=n_patches_per_class,
-                                  wsis_info=wsis_info) \
-               .calc_class_step_size(class_name)
+    @staticmethod
+    def _calc_class_step_size(image_paths: List[Path], step_size_finder: StepSizeFinder) -> int:
+        return step_size_finder.search(image_paths)
 
     @staticmethod
     def _create_process_pool(num_workers: int):
@@ -188,5 +189,9 @@ class PatchExtractor(ABC):
     def _extract_classes(wsis_info):
         return wsis_info['label'].unique()
 
-    def _search_image_paths(self, wsis_info: pd.DataFrame) -> List[Path]:
+    @staticmethod
+    def _search_image_paths(wsis_info: pd.DataFrame) -> List[Path]:
         return wsis_info['path'].apply(Path).tolist()
+
+    def set_logger_level(self, level):
+        self._logger.setLevel(level)
