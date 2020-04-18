@@ -1,10 +1,3 @@
-"""
-DeepSlide
-Contains all hyperparameters for the entire repository.
-
-Authors: Jason Wei, Behnaz Abdollahi, Saeed Hassanpour
-"""
-
 import argparse
 import logging
 

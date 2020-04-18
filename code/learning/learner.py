@@ -242,7 +242,7 @@ class Learner:
             start_epoch: Starting epoch for learning.
             writer: Writer to write logging information.
         """
-        since = time.time()
+        learning_init_time = time.time()
 
         # Initialize all the tensors to be used in learning and validation.
         # Do this outside the loop since it will be written over entirely at each
@@ -259,6 +259,7 @@ class Learner:
 
         # Train for specified number of epochs.
         for epoch in range(start_epoch, self._num_epochs):
+            epoch_init_time = time.time()
 
             # Training phase.
             model.train(mode=True)
@@ -371,8 +372,9 @@ class Learner:
                          f"{train_acc:.4f},{val_loss:.4f},{val_acc:.4f}\n")
 
             # Print the diagnostics for each epoch.
-            logging.info(f"Epoch {epoch} with lr "
-                         f"{current_lr:.15f}: "
+            logging.info(f"Epoch {epoch} "
+                         f"with lr {current_lr:.15f}: "
+                         f"{self._format_time_period(epoch_init_time, time.time())} "
                          f"t_loss: {train_loss:.4f} "
                          f"t_acc: {train_acc:.4f} "
                          f"v_loss: {val_loss:.4f} "
@@ -385,4 +387,11 @@ class Learner:
 
         # Print learning information at the end.
         logging.info(f"\nlearning complete in "
-                     f"{(time.time() - since) // 60:.2f} minutes")
+                     f"{self._format_time_period(learning_init_time, time.time())}")
+
+    @staticmethod
+    def _format_time_period(start, end) -> str:
+        period = end - start
+        if period > 60:
+            return f"{period / 60:.2f} minutes"
+        return f"{period:.0f}s"
