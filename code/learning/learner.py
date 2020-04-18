@@ -10,6 +10,8 @@ import torch.optim as optim
 import torchvision
 from torch.optim import lr_scheduler
 from torchvision import (datasets, transforms)
+
+from code.learning.early_stopper import EarlyStopper
 from code.learning.random90rotation import Random90Rotation
 from code.models import resnet
 
@@ -23,7 +25,7 @@ class Learner:
                  color_jitter_hue: float, color_jitter_saturation: float,
                  path_mean: List[float], path_std: List[float], num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
-                 num_epochs: int, save_interval: int):
+                 num_epochs: int, save_interval: int, early_stopping_patience: int):
         """
         Args:
             train_folder: Location of the automatically built learning input folder.
@@ -73,6 +75,7 @@ class Learner:
         self._checkpoints_folder = checkpoints_folder
         self._num_epochs = num_epochs
         self._save_interval = save_interval
+        self._early_stopping_patience = early_stopping_patience
 
     def train(self) -> None:
         # Loading in the data.
@@ -252,6 +255,7 @@ class Learner:
                                      dtype=torch.long).cpu()
         val_all_predicts = torch.empty(size=(dataset_sizes["val"],),
                                        dtype=torch.long).cpu()
+        early_stopper = EarlyStopper(patience=self._early_stopping_patience)
 
         # Train for specified number of epochs.
         for epoch in range(start_epoch, self._num_epochs):
@@ -373,6 +377,11 @@ class Learner:
                          f"t_acc: {train_acc:.4f} "
                          f"v_loss: {val_loss:.4f} "
                          f"v_acc: {val_acc:.4f}\n")
+
+            early_stopper.update(val_loss)
+            if early_stopper.is_stopping():
+                logging.info("Early stopping")
+                break
 
         # Print learning information at the end.
         logging.info(f"\nlearning complete in "

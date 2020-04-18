@@ -301,6 +301,13 @@ class ArgumentParser(argparse.ArgumentParser):
                             help="Learning rate decay amount per epoch")
         return self
 
+    def with_early_stopping(self):
+        self.add_argument("--early_stopping",
+                            type=int,
+                            default=15,
+                            help="Early stopping patience")
+        return self
+
     def with_resume_checkpoint(self):
         self.add_argument("--resume_checkpoint",
                             type=bool,

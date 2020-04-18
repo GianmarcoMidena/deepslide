@@ -11,7 +11,7 @@ import logging
 from .downscaling import downscale
 from .splitting import split
 from .tiling import tile
-from .learning import learn
+from .learning import train
 from .evaluation import test, final_test
 from .grid_searching import grid_search
 from .visualization import visualize
@@ -28,7 +28,7 @@ def config():
     downscale.add_parser(subparsers)
     split.add_parser(subparsers)
     tile.add_parser(subparsers)
-    learn.add_parser(subparsers)
+    train.add_parser(subparsers)
     test.add_parser(subparsers)
     grid_search.add_parser(subparsers)
     visualize.add_parser(subparsers)

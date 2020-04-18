@@ -3,7 +3,7 @@ from code.learning.learner import Learner
 from code.utils import get_log_csv_name
 
 
-def learn(args):
+def train(args):
     args = Configurer(args).with_device() \
         .with_classes() \
         .with_num_classes() \
@@ -39,7 +39,8 @@ def learn(args):
             save_interval=args.save_interval,
             num_epochs=args.num_epochs,
             train_folder=args.train_folder,
-            weight_decay=args.weight_decay).train()
+            weight_decay=args.weight_decay,
+            early_stopping_patience=args.early_stopping).train()
 
 
 def add_parser(subparsers):
@@ -60,8 +61,9 @@ def add_parser(subparsers):
         .with_num_epochs() \
         .with_train_folder() \
         .with_weight_decay() \
+        .with_early_stopping() \
         .with_checkpoint_file() \
         .with_checkpoints_folder() \
         .with_log_folder() \
         .with_image_ext() \
-        .set_defaults(func=learn)
+        .set_defaults(func=train)
