@@ -47,7 +47,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--wsis_info",
             type=Path,
             default=Path("wsis_info.csv"),
-            help="Location to a CSV file containing wsis metadata"
+            help="Location of a CSV file containing wsis metadata"
         )
         return self
 
@@ -442,4 +442,13 @@ class ArgumentParser(argparse.ArgumentParser):
             type=Path,
             default=Path("vis_test"),
             help="Folder for outputting the WSI evaluation prediction visualizations")
+        return self
+
+    def with_class_colors(self):
+        self.add_argument(
+            "--class_colors",
+            type=Path,
+            default=Path("class_colors.json"),
+            help="Location of a JSON file that maps each class with a color"
+        )
         return self

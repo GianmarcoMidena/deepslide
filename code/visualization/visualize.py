@@ -10,14 +10,8 @@ def visualize(args):
         .with_num_classes() \
         .build()
 
-    # This order is the same order as your sorted classes.
-    colors = ("red", "white", "blue", "green", "purple",
-              "orange", "black", "pink", "yellow")
-
-    viewer = Viewer(classes=args.classes,
-                    colors=colors,
-                    num_classes=args.num_classes,
-                    patch_size=args.patch_size)
+    viewer = Viewer(patch_size=args.patch_size, classes=args.classes, num_classes=args.num_classes,
+                    colors_path=args.class_colors)
 
     val_wsis_info = pd.read_csv(args.wsis_val)
     test_wsis_info = pd.read_csv(args.wsis_test)
@@ -44,4 +38,5 @@ def add_parser(subparsers):
         .with_preds_test() \
         .with_vis_val() \
         .with_vis_test() \
+        .with_class_colors() \
         .set_defaults(func=visualize)

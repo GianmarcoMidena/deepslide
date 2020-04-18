@@ -1,24 +1,26 @@
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 import numpy as np
 import pandas as pd
 from imageio import imread, imsave
 
 
 class Viewer:
-    def __init__(self, classes: List[str], num_classes: int,
-                 colors: Tuple[str], patch_size: int):
+    _DEFAULT_COLORS = ("red", "white", "blue", "green", "purple",
+                       "orange", "black", "pink", "yellow")
+
+    def __init__(self, patch_size: int, classes: List[str] = None, num_classes: int = None, colors_path: Path = None):
         """
         Args:
+            patch_size: Size of the patches extracted from the WSI.
             classes: Names of the classes in the dataset.
             num_classes: Number of classes in the dataset.
-            colors: Colors to use for visualization.
-            patch_size: Size of the patches extracted from the WSI.
+            colors_path: Location of a JSON file that maps each class with a color.
         """
         self._classes = classes
         self._num_classes = num_classes
-        self._colors = colors
+        self._colors_path = colors_path
         self._patch_size = patch_size
 
     def visualize(self, wsis_info: pd.DataFrame, partition_name: str,
@@ -30,22 +32,21 @@ class Viewer:
         """
         logging.info(f"Visualizing {partition_name} set...")
 
+        class_colors = self._load_class_colors()
+
         n_slides = wsis_info.shape[0]
         # Find list of WSI.
         logging.info(f"{n_slides} {partition_name} whole slides found")
-        prediction_to_color = pd.Series({
-            self._classes[i]: self._color_to_np_color(color=self._colors[i])
-            for i in range(self._num_classes)
-        })
+
         # Go over all of the WSI.
         for _, wsi_info in wsis_info.iterrows():
             # Read in the image.
-            whole_slide_numpy = imread(uri=wsi_info['path'])[..., [0, 1, 2]]
+            whole_slide = imread(uri=wsi_info['path'])[..., [0, 1, 2]]
             logging.info(f"visualizing {wsi_info['id']} "
-                         f"of shape {whole_slide_numpy.shape}")
+                         f"of shape {whole_slide.shape}")
 
-            assert whole_slide_numpy.shape[2] == 3, \
-                f"Expected 3 channels while your image has {whole_slide_numpy.shape[2]} channels."
+            assert whole_slide.shape[2] == 3, \
+                f"Expected 3 channels while your image has {whole_slide.shape[2]} channels."
 
             # Save it.
             output_file_name = f"{wsi_info['id']}_predictions.jpg"
@@ -57,12 +58,12 @@ class Viewer:
             # Temporary fix. Need not to make folders with no crops.
             try:
                 # Add the predictions to the image and save it.
-                imsave(uri=output_path,
-                       im=self._add_predictions_to_image(
-                           predictions=pd.read_csv(preds_folder.joinpath(wsi_info['id']).with_suffix(".csv")),
-                           image=whole_slide_numpy,
-                           prediction_to_color=prediction_to_color,
-                           patch_size=self._patch_size))
+                patch_preds = pd.read_csv(preds_folder.joinpath(f"{wsi_info['id']}.csv"))
+                wsi_with_patch_preds = self._decorate_wsi_with_patch_preds(patch_predictions=patch_preds,
+                                                                           whole_slide=whole_slide,
+                                                                           class_colors=class_colors,
+                                                                           patch_size=self._patch_size)
+                imsave(uri=output_path, im=wsi_with_patch_preds)
             except FileNotFoundError:
                 logging.info(
                     "WARNING: One of the image directories is empty. Skipping this directory"
@@ -96,27 +97,41 @@ class Viewer:
         return colors[color]
 
     @staticmethod
-    def _add_predictions_to_image(
-            predictions: pd.DataFrame,
-            image: np.ndarray, prediction_to_color: pd.Series,
+    def _decorate_wsi_with_patch_preds(
+            patch_predictions: pd.DataFrame,
+            whole_slide: np.ndarray, class_colors: pd.Series,
             patch_size: int) -> np.ndarray:
         """
         Overlay the predicted dots (classes) on the WSI.
 
         Args:
-            image: WSI to add predicted dots to.
-            prediction_to_color: Dictionary mapping string color to NumPy ndarray color.
+            whole_slide: WSI to add predicted dots to.
+            class_colors: Dictionary mapping string color to NumPy ndarray color.
             patch_size: Size of the patches extracted from the WSI.
 
         Returns:
             The WSI with the predicted class dots overlaid.
         """
-        for _, r in predictions.iterrows():
+        for _, r in patch_predictions.iterrows():
             x = r['x']
             y = r['y']
             prediction = r['prediction']
             # Enlarge the dots so they are visible at larger scale.
             start = round((0.9 * patch_size) / 2)
             end = round((1.1 * patch_size) / 2)
-            image[x + start:x + end, y + start:y + end, :] = prediction_to_color[prediction]
-        return image
+            whole_slide[x + start:x + end, y + start:y + end, :] = class_colors[prediction]
+        return whole_slide
+
+    def _load_class_colors(self) -> pd.Series():
+        if self._colors_path is not None:
+            if self._colors_path.is_file():
+                class_colors = pd.read_json(self._colors_path, typ='series') \
+                                 .apply(self._color_to_np_color)
+            else:
+                raise Exception(f'"{self._colors_path}" file does not exist!')
+        else:
+            class_colors = pd.Series({
+                self._classes[i]: self._color_to_np_color(color=self._DEFAULT_COLORS[i])
+                for i in range(self._num_classes)
+            })
+        return class_colors
