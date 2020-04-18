@@ -1,9 +1,10 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from imageio import imread, imsave
+import cv2 as cv
 
 
 class Viewer:
@@ -63,7 +64,7 @@ class Viewer:
                                                                            whole_slide=whole_slide,
                                                                            class_colors=class_colors,
                                                                            patch_size=self._patch_size)
-                imsave(uri=output_path, im=wsi_with_patch_preds)
+                imsave(output_path, wsi_with_patch_preds)
             except FileNotFoundError:
                 logging.info(
                     "WARNING: One of the image directories is empty. Skipping this directory"
@@ -73,7 +74,7 @@ class Viewer:
         logging.info(f"find the visualizations in {vis_folder}")
 
     @staticmethod
-    def _color_to_np_color(color: str) -> np.ndarray:
+    def _color_name_to_tuple(color: str) -> Tuple[int, int, int]:
         """
         Convert strings to NumPy colors.
 
@@ -84,15 +85,15 @@ class Viewer:
             The NumPy ndarray representation of the color.
         """
         colors = {
-            "white": np.array([255, 255, 255]),
-            "pink": np.array([255, 108, 180]),
-            "black": np.array([0, 0, 0]),
-            "red": np.array([255, 0, 0]),
-            "purple": np.array([225, 225, 0]),
-            "yellow": np.array([255, 255, 0]),
-            "orange": np.array([255, 127, 80]),
-            "blue": np.array([0, 0, 255]),
-            "green": np.array([0, 255, 0])
+            "white": (255, 255, 255),
+            "pink": (255, 108, 180),
+            "black": (0, 0, 0),
+            "red": (255, 0, 0),
+            "purple": (225, 225, 0),
+            "yellow": (255, 255, 0),
+            "orange": (255, 127, 80),
+            "blue": (0, 0, 255),
+            "green": (0, 255, 0)
         }
         return colors[color]
 
@@ -112,26 +113,29 @@ class Viewer:
         Returns:
             The WSI with the predicted class dots overlaid.
         """
+        whole_slide = cv.UMat(whole_slide)
         for _, r in patch_predictions.iterrows():
             x = r['x']
             y = r['y']
             prediction = r['prediction']
             # Enlarge the dots so they are visible at larger scale.
-            start = round((0.9 * patch_size) / 2)
-            end = round((1.1 * patch_size) / 2)
-            whole_slide[x + start:x + end, y + start:y + end, :] = class_colors[prediction]
-        return whole_slide
+            confidence = (r['confidence'] - .5) * 2 * .7 + .3
+            half_patch_size = patch_size // 2
+            radius = round(.06 * patch_size * confidence)
+            center = (y + half_patch_size, x + half_patch_size)
+            whole_slide = cv.circle(whole_slide, center, radius, class_colors[prediction], cv.FILLED)
+        return whole_slide.get()
 
     def _load_class_colors(self) -> pd.Series():
         if self._colors_path is not None:
             if self._colors_path.is_file():
                 class_colors = pd.read_json(self._colors_path, typ='series') \
-                                 .apply(self._color_to_np_color)
+                    .apply(self._color_name_to_tuple)
             else:
                 raise Exception(f'"{self._colors_path}" file does not exist!')
         else:
             class_colors = pd.Series({
-                self._classes[i]: self._color_to_np_color(color=self._DEFAULT_COLORS[i])
+                self._classes[i]: self._color_name_to_tuple(color=self._DEFAULT_COLORS[i])
                 for i in range(self._num_classes)
             })
         return class_colors
