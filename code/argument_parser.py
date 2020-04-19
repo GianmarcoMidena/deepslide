@@ -62,55 +62,55 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_val_wsi_per_class(self):
         # For splitting into validation set.
         self.add_argument("--val_wsi_per_class",
-                            type=int,
-                            default=20,
-                            help="Number of WSI per class to use in validation set")
+                          type=int,
+                          default=20,
+                          help="Number of WSI per class to use in validation set")
         return self
 
     def with_test_wsi_per_class(self):
         # For splitting into evaluation set, remaining images used in train.
         self.add_argument("--test_wsi_per_class",
-                            type=int,
-                            default=30,
-                            help="Number of WSI per class to use in test set")
+                          type=int,
+                          default=30,
+                          help="Number of WSI per class to use in test set")
         return self
 
     def with_num_workers(self):
         # Number of processes to use.
         self.add_argument("--num_workers",
-                            type=int,
-                            default=8,
-                            help="Number of workers to use for IO")
+                          type=int,
+                          default=8,
+                          help="Number of workers to use for IO")
         return self
 
     def with_patch_size(self):
         # Default shape for ResNet in PyTorch.
         self.add_argument("--patch_size",
-                            type=int,
-                            default=224,
-                            help="Size of the patches extracted from the WSI")
+                          type=int,
+                          default=224,
+                          help="Size of the patches extracted from the WSI")
         return self
 
     def with_wsis_train(self):
         # Where the CSV file labels will go.
         self.add_argument("--wsis_train",
-                            type=Path,
-                            default=Path("wsis_train.csv"),
-                            help="Location to store the CSV file info for learning wsis")
+                          type=Path,
+                          default=Path("wsis_train.csv"),
+                          help="Location to store the CSV file info for learning wsis")
         return self
 
     def with_wsis_val(self):
         self.add_argument("--wsis_val",
-                            type=Path,
-                            default=Path("wsis_val.csv"),
-                            help="Location to store the CSV file info for validation wsis")
+                          type=Path,
+                          default=Path("wsis_val.csv"),
+                          help="Location to store the CSV file info for validation wsis")
         return self
 
     def with_wsis_test(self):
         self.add_argument("--wsis_test",
-                            type=Path,
-                            default=Path("wsis_test.csv"),
-                            help="Location to store the CSV file info for evaluation wsis")
+                          type=Path,
+                          default=Path("wsis_test.csv"),
+                          help="Location to store the CSV file info for evaluation wsis")
         return self
 
     def with_train_folder(self):
@@ -158,9 +158,9 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_num_train_patches_per_class(self):
         # Target number of learning patches per class.
         self.add_argument("--num_train_patches_per_class",
-            type=int,
-            default=80000,
-            help="Target number of learning samples per class")
+                          type=int,
+                          default=80000,
+                          help="Target number of learning samples per class")
         return self
 
     def with_purple_threshold(self):
@@ -258,9 +258,9 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_num_epochs(self):
         # Model hyperparameters.
         self.add_argument("--num_epochs",
-                            type=int,
-                            default=20,
-                            help="Number of epochs for learning")
+                          type=int,
+                          default=20,
+                          help="Number of epochs for learning")
         return self
 
     def with_num_layers(self):
@@ -275,59 +275,59 @@ class ArgumentParser(argparse.ArgumentParser):
 
     def with_learning_rate(self):
         self.add_argument("--learning_rate",
-                            type=float,
-                            default=0.001,
-                            help="Learning rate to use for gradient descent")
+                          type=float,
+                          default=0.001,
+                          help="Learning rate to use for gradient descent")
         return self
 
     def with_batch_size(self):
         self.add_argument("--batch_size",
-                            type=int,
-                            default=16,
-                            help="Mini-batch size to use for learning")
+                          type=int,
+                          default=16,
+                          help="Mini-batch size to use for learning")
         return self
 
     def with_weight_decay(self):
         self.add_argument("--weight_decay",
-                            type=float,
-                            default=1e-4,
-                            help="Weight decay (L2 penalty) to use in optimizer")
+                          type=float,
+                          default=1e-4,
+                          help="Weight decay (L2 penalty) to use in optimizer")
         return self
 
     def with_learning_rate_decay(self):
         self.add_argument("--learning_rate_decay",
-                            type=float,
-                            default=0.85,
-                            help="Learning rate decay amount per epoch")
+                          type=float,
+                          default=0.85,
+                          help="Learning rate decay amount per epoch")
         return self
 
     def with_early_stopping(self):
         self.add_argument("--early_stopping",
-                            type=int,
-                            default=15,
-                            help="Early stopping patience")
+                          type=int,
+                          default=15,
+                          help="Early stopping patience")
         return self
 
     def with_resume_checkpoint(self):
         self.add_argument("--resume_checkpoint",
-                            type=bool,
-                            default=False,
-                            help="Resume model from checkpoint file")
+                          type=bool,
+                          default=False,
+                          help="Resume model from checkpoint file")
         return self
 
     def with_save_interval(self):
         self.add_argument("--save_interval",
-                            type=int,
-                            default=1,
-                            help="Number of epochs between saving checkpoints")
+                          type=int,
+                          default=1,
+                          help="Number of epochs between saving checkpoints")
         return self
 
     def with_checkpoints_folder(self):
         # Where models are saved.
         self.add_argument("--checkpoints_folder",
-                            type=Path,
-                            default=Path("checkpoints"),
-                            help="Directory to save model checkpoints to")
+                          type=Path,
+                          default=Path("checkpoints"),
+                          help="Directory to save model checkpoints to")
         return self
 
     def with_checkpoint_file(self):
@@ -342,16 +342,16 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_pretrain(self):
         # ImageNet pretrain?
         self.add_argument("--pretrain",
-                            type=bool,
-                            default=False,
-                            help="Use pretrained ResNet weights")
+                          type=bool,
+                          default=False,
+                          help="Use pretrained ResNet weights")
         return self
 
     def with_log_folder(self):
         self.add_argument("--log_folder",
-                            type=Path,
-                            default=Path("logs"),
-                            help="Directory to save logs to")
+                          type=Path,
+                          default=Path("logs"),
+                          help="Directory to save logs to")
         return self
 
     def with_auto_select(self):

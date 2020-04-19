@@ -1,13 +1,7 @@
-"""
-DeepSlide
-Computes the image statistics for normalization.
-
-Authors: Naofumi Tomita
-"""
-
 from pathlib import Path
 from typing import (List, Tuple)
 
+import tensorflow as tf
 import torch
 from PIL import Image
 from torchvision.transforms import ToTensor
@@ -15,14 +9,12 @@ from torchvision.transforms import ToTensor
 Image.MAX_IMAGE_PIXELS = None
 
 
-def compute_stats(folderpath: Path,
-                  image_ext: str) -> Tuple[List[float], List[float]]:
+def online_mean_and_std(paths: List[Path]) -> Tuple[List[float], List[float]]:
     """
-    Compute the mean and standard deviation of the images found in folderpath.
+    Compute the mean and standard deviation of the images found in paths.
 
     Args:
-        folderpath: Path containing images.
-        image_ext: Extension of the image files.
+        paths: List of paths of image files.
 
     Returns:
         A tuple containing the mean and standard deviation for the images over the channel, height, and width axes.
@@ -30,6 +22,7 @@ def compute_stats(folderpath: Path,
     This implementation is based on the discussion from: 
         https://discuss.pytorch.org/t/about-normalization-using-pre-trained-vgg16-networks/23560/9
     """
+
     class MyDataset(torch.utils.data.Dataset):
         """
         Creates a dataset by reading images.
@@ -37,18 +30,15 @@ def compute_stats(folderpath: Path,
         Attributes:
             data: List of the string image filenames.
         """
-        def __init__(self, folder: Path) -> None:
+
+        def __init__(self, paths: List[Path]) -> None:
             """
             Create the MyDataset object.
 
             Args:
-                folder: Path to the images.
+                paths: List of paths of image files.
             """
-            self.data = []
-
-            for file in folder.rglob(f"*{image_ext}"):
-                if not file.name.startswith("."):
-                    self.data.append(file)
+            self._paths = paths
 
         def __getitem__(self, index: int) -> torch.Tensor:
             """
@@ -60,12 +50,12 @@ def compute_stats(folderpath: Path,
             Returns:
                 A PyTorch Tensor in the correct color space.
             """
-            return ToTensor()(Image.open(self.data[index]).convert("RGB"))
+            return ToTensor()(Image.open(self._paths[index]).convert("RGB"))
 
         def __len__(self) -> int:
-            return len(self.data)
+            return len(self._paths)
 
-    def online_mean_and_sd(loader: torch.utils.data.DataLoader
+    def _online_mean_and_sd(loader: torch.utils.data.DataLoader
                            ) -> Tuple[List[float], List[float]]:
         """
         Computes the mean and standard deviation online.
@@ -77,24 +67,29 @@ def compute_stats(folderpath: Path,
         Returns:
             A tuple containing the mean and standard deviation for the images over the channel, height, and width axes.
         """
-        cnt = 0
-        fst_moment = torch.empty(3)
-        snd_moment = torch.empty(3)
+        last_tot_pixels = 0
+        fst_moment = tf.zeros(3)
+        snd_moment = tf.zeros(3)
 
         for data in loader:
+            data = data.numpy()
             b, __, h, w = data.shape
-            nb_pixels = b * h * w
-            fst_moment = (cnt * fst_moment +
-                          torch.sum(data, dim=[0, 2, 3])) / (cnt + nb_pixels)
-            snd_moment = (cnt * snd_moment + torch.sum(
-                data**2, dim=[0, 2, 3])) / (cnt + nb_pixels)
-            cnt += nb_pixels
-        return fst_moment.tolist(), torch.sqrt(snd_moment -
-                                               fst_moment**2).tolist()
+            current_n_pixels = b * h * w
+            tot_pixels = last_tot_pixels + current_n_pixels
+            fst_moment = ((last_tot_pixels * fst_moment +
+                           tf.reduce_sum(data, axis=[0, 2, 3]))
+                          / tot_pixels)
+            snd_moment = ((last_tot_pixels * snd_moment +
+                           tf.reduce_sum(data ** 2, axis=[0, 2, 3]))
+                          / tot_pixels)
+            last_tot_pixels = tot_pixels
+        mean = fst_moment.numpy().tolist()
+        std = tf.sqrt(snd_moment - fst_moment ** 2).numpy().tolist()
+        return mean, std
 
-    return online_mean_and_sd(
+    return _online_mean_and_sd(
         loader=torch.utils.data.DataLoader(dataset=MyDataset(
-            folder=folderpath),
-                                           batch_size=1,
-                                           num_workers=1,
-                                           shuffle=False))
+            paths=paths),
+            batch_size=1,
+            num_workers=1,
+            shuffle=False))

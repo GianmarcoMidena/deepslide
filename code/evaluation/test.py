@@ -1,3 +1,4 @@
+import pandas as pd
 from .tester import Tester
 from ..configurer import Configurer
 
@@ -7,7 +8,6 @@ def test(args):
         .with_device()\
         .with_classes()\
         .with_num_classes()\
-        .with_wsi_mean_and_std()\
         .build()
 
     # Does nothing if auto_select is True.
@@ -22,18 +22,21 @@ def test(args):
                     num_classes=args.num_classes,
                     num_layers=args.num_layers,
                     num_workers=args.num_workers,
-                    path_mean=args.path_mean,
-                    path_std=args.path_std,
                     pretrain=args.pretrain)
+
+    val_wsis_info = pd.read_csv(args.wsis_val)
+    test_wsis_info = pd.read_csv(args.wsis_test)
 
     # Run the ResNet on the generated patches.
     # Validation patches.
     tester.predict(patches_eval_folder=args.patches_eval_val,
+                   wsis_info=val_wsis_info,
                    partition_name='validation',
                    output_folder=args.preds_val)
 
     # Test patches.
     tester.predict(patches_eval_folder=args.patches_eval_test,
+                   wsis_info=test_wsis_info,
                    partition_name='evaluation',
                    output_folder=args.preds_test)
 
@@ -52,5 +55,6 @@ def add_parser(subparsers):
         .with_pretrain() \
         .with_checkpoints_folder() \
         .with_checkpoint_file() \
-        .with_image_ext() \
+        .with_wsis_val() \
+        .with_wsis_test() \
         .set_defaults(func=test)

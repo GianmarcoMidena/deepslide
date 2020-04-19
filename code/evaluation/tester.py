@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from torch import nn
 from torchvision import datasets, transforms
+from ..compute_stats import online_mean_and_std
 
 from code.utils import extract_subfolder_paths, search_folder_image_paths
 from code.models import resnet
@@ -16,7 +17,6 @@ class Tester:
     def __init__(self, checkpoints_folder: Path, auto_select: bool,
                  eval_model: Path, device: torch.device,
                  classes: List[str], num_classes: int,
-                 path_mean: List[float], path_std: List[float],
                  num_layers: int, pretrain: bool,
                  batch_size: int, num_workers: int):
         self._auto_select = auto_select
@@ -28,8 +28,6 @@ class Tester:
         self._num_classes = num_classes
         self._num_layers = num_layers
         self._num_workers = num_workers
-        self._path_mean = path_mean
-        self._path_std = path_std
         self._pretrain = pretrain
         self._model = None
         """
@@ -50,7 +48,7 @@ class Tester:
             num_workers: Number of workers to use for IO.
         """
 
-    def predict(self, patches_eval_folder: Path,
+    def predict(self, patches_eval_folder: Path, wsis_info: pd.DataFrame,
                 partition_name: str, output_folder: Path) -> None:
         """
         Args:
@@ -73,16 +71,16 @@ class Tester:
         # For each WSI.
         for image_folder in image_folders:
             try:
-                self._predict_for_wsi(image_folder, output_folder)
+                self._predict_for_wsi(image_folder, output_folder, wsis_info)
             except self._EmptyImageDirectoryException as e:
                 logging.error(str(e))
 
         logging.info(f"time for {patches_eval_folder}: {time.time() - start:.2f} seconds")
 
-    def _predict_for_wsi(self, patches_dir_path, output_folder):
+    def _predict_for_wsi(self, patches_dir_path, output_folder, wsis_info: pd.DataFrame):
         logging.info(patches_dir_path)
 
-        data = self._load_data(patches_dir_path)
+        data = self._load_data(patches_dir_path, wsis_info)
 
         num_test_image_windows = len(data) * self._batch_size
 
@@ -148,7 +146,8 @@ class Tester:
     def _to_class_name(self, id):
         return self._classes[id]
 
-    def _load_data(self, patches_dir_path):
+    def _load_data(self, patches_dir_path, wsis_info: pd.DataFrame):
+        mean, std = online_mean_and_std(paths=wsis_info['path'].apply(Path).tolist())
         # Temporary fix. Need not to make folders with no crops.
         try:
             dataloader = torch.utils.data.DataLoader(
@@ -156,7 +155,7 @@ class Tester:
                     root=str(patches_dir_path),
                     transform=transforms.Compose(transforms=[
                         transforms.ToTensor(),
-                        transforms.Normalize(mean=self._path_mean, std=self._path_std)
+                        transforms.Normalize(mean=mean, std=std)
                     ])),
                 batch_size=self._batch_size,
                 shuffle=False,

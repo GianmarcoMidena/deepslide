@@ -2,7 +2,6 @@ import logging
 
 import torch
 
-from code.compute_stats import compute_stats
 from code.utils import get_classes
 
 
@@ -21,12 +20,6 @@ class Configurer:
 
     def with_num_classes(self):
         self._args.num_classes = len(self._args.classes)
-        return self
-
-    def with_wsi_mean_and_std(self):
-        # Compute the mean and standard deviation for the given set of WSI for normalization.
-        self._args.path_mean, self._args.path_std = compute_stats(folderpath=self._args.all_wsi,
-                                                                  image_ext=self._args.image_ext)
         return self
 
     def build(self):

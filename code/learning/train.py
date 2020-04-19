@@ -1,3 +1,4 @@
+import pandas as pd
 from code.configurer import Configurer
 from code.learning.learner import Learner
 from code.utils import get_log_csv_name
@@ -7,7 +8,6 @@ def train(args):
     args = Configurer(args).with_device() \
         .with_classes() \
         .with_num_classes() \
-        .with_wsi_mean_and_std() \
         .build()
 
     # Only used is resume_checkpoint is True.
@@ -15,6 +15,9 @@ def train(args):
 
     # Named with date and time.
     log_csv = get_log_csv_name(log_folder=args.log_folder)
+
+    train_wsis_info = pd.read_csv(args.wsis_train)
+    val_wsis_info = pd.read_csv(args.wsis_val)
 
     # Training the ResNet.
     Learner(batch_size=args.batch_size,
@@ -31,8 +34,6 @@ def train(args):
             num_classes=args.num_classes,
             num_layers=args.num_layers,
             num_workers=args.num_workers,
-            path_mean=args.path_mean,
-            path_std=args.path_std,
             pretrain=args.pretrain,
             resume_checkpoint=args.resume_checkpoint,
             resume_checkpoint_path=resume_checkpoint_path,
@@ -40,7 +41,8 @@ def train(args):
             num_epochs=args.num_epochs,
             train_folder=args.train_folder,
             weight_decay=args.weight_decay,
-            early_stopping_patience=args.early_stopping).train()
+            early_stopping_patience=args.early_stopping,
+            train_wsis_info=train_wsis_info, val_wsis_info=val_wsis_info).train()
 
 
 def add_parser(subparsers):
@@ -65,5 +67,6 @@ def add_parser(subparsers):
         .with_checkpoint_file() \
         .with_checkpoints_folder() \
         .with_log_folder() \
-        .with_image_ext() \
+        .with_wsis_train() \
+        .with_wsis_val() \
         .set_defaults(func=train)

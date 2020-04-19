@@ -11,6 +11,7 @@ import torchvision
 from torch.optim import lr_scheduler
 from torchvision import (datasets, transforms)
 
+from code.compute_stats import online_mean_and_std
 from code.learning.early_stopper import EarlyStopper
 from code.learning.random90rotation import Random90Rotation
 from code.models import resnet
@@ -22,10 +23,10 @@ class Learner:
                  weight_decay: float, learning_rate_decay: float,
                  resume_checkpoint: bool, resume_checkpoint_path: Path, log_csv: Path,
                  color_jitter_brightness: float, color_jitter_contrast: float,
-                 color_jitter_hue: float, color_jitter_saturation: float,
-                 path_mean: List[float], path_std: List[float], num_classes: int,
+                 color_jitter_hue: float, color_jitter_saturation: float, num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
-                 num_epochs: int, save_interval: int, early_stopping_patience: int):
+                 num_epochs: int, save_interval: int, early_stopping_patience: int,
+                 train_wsis_info: pd.DataFrame, val_wsis_info: pd.DataFrame):
         """
         Args:
             train_folder: Location of the automatically built learning input folder.
@@ -43,8 +44,6 @@ class Learner:
             color_jitter_contrast: Random contrast jitter to use in data augmentation for ColorJitter() transform.
             color_jitter_hue: Random hue jitter to use in data augmentation for ColorJitter() transform.
             color_jitter_saturation: Random saturation jitter to use in data augmentation for ColorJitter() transform.
-            path_mean: Means of the WSIs for each dimension.
-            path_std: Standard deviations of the WSIs for each dimension.
             num_classes: Number of classes in the dataset.
             num_layers: Number of layers to use in the ResNet model from [18, 34, 50, 101, 152].
             pretrain: Use pretrained ResNet weights.
@@ -67,8 +66,6 @@ class Learner:
         self._color_jitter_contrast = color_jitter_contrast
         self._color_jitter_hue = color_jitter_hue
         self._color_jitter_saturation = color_jitter_saturation
-        self._path_mean = path_mean
-        self._path_std = path_std
         self._num_classes = num_classes
         self._num_layers = num_layers
         self._pretrain = pretrain
@@ -76,6 +73,8 @@ class Learner:
         self._num_epochs = num_epochs
         self._save_interval = save_interval
         self._early_stopping_patience = early_stopping_patience
+        self._train_wsis_info = train_wsis_info
+        self._val_wsis_info = val_wsis_info
 
     def train(self) -> None:
         # Loading in the data.
@@ -184,6 +183,11 @@ class Learner:
         Returns:
             A dictionary mapping learning and validation strings to data transforms.
         """
+        train_image_paths = self._train_wsis_info['path'].apply(Path).tolist()
+        val_image_paths = self._val_wsis_info['path'].apply(Path).tolist()
+        train_mean, train_std = online_mean_and_std(paths=train_image_paths)
+        val_mean, val_std = online_mean_and_std(paths=val_image_paths)
+
         return {
             "train":
                 transforms.Compose(transforms=[
@@ -195,12 +199,12 @@ class Learner:
                     transforms.RandomVerticalFlip(),
                     Random90Rotation(),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=self._path_mean, std=self._path_std)
+                    transforms.Normalize(mean=train_mean, std=train_std)
                 ]),
             "val":
                 transforms.Compose(transforms=[
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=self._path_mean, std=self._path_std)
+                    transforms.Normalize(mean=val_mean, std=val_std)
                 ])
         }
 
