@@ -5,8 +5,7 @@ from .downscaling import downscale
 from .splitting import split
 from .tiling import tile
 from .learning import train
-from .evaluation import test, final_test
-from .grid_searching import grid_search
+from .evaluation import test, final_test, grid_search
 from .visualization import visualize
 
 from .argument_parser import ArgumentParser

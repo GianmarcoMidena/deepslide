@@ -127,7 +127,7 @@ class WSISplitter:
     @staticmethod
     def _increment_report(images_info: pd.DataFrame, image_paths: List[Path]) -> pd.DataFrame:
         for image_path in image_paths:
-            image_info = {'id': str(image_path.with_suffix("").name),
+            image_info = {'id': str(image_path.stem),
                           'path': str(image_path),
                           'label': image_path.parent.name}
             images_info = images_info.append(image_info, ignore_index=True, sort=False)

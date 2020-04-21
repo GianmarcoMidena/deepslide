@@ -10,7 +10,6 @@ def test(args):
         .with_num_classes()\
         .build()
 
-    # Does nothing if auto_select is True.
     eval_model = args.checkpoints_folder.joinpath(args.checkpoint_file)
 
     tester = Tester(auto_select=args.auto_select,
@@ -27,14 +26,13 @@ def test(args):
     val_wsis_info = pd.read_csv(args.wsis_val)
     test_wsis_info = pd.read_csv(args.wsis_test)
 
-    # Run the ResNet on the generated patches.
-    # Validation patches.
+    # Apply the model to the validation patches.
     tester.predict(patches_eval_folder=args.patches_eval_val,
                    wsis_info=val_wsis_info,
                    partition_name='validation',
                    output_folder=args.preds_val)
 
-    # Test patches.
+    # Apply the model to the test patches.
     tester.predict(patches_eval_folder=args.patches_eval_test,
                    wsis_info=test_wsis_info,
                    partition_name='evaluation',
