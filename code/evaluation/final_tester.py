@@ -26,16 +26,24 @@ class FinalTester:
         """
         logging.info("Finding best confidence threshold...")
 
-        best_acc = 0
+        best_macro_avg_acc = 0
         best_confidence_th = None
         for preds_i, confidence_th_i in self._search_predictions_and_confidence_th(inference_folder):
-            true_labels_i = self._extract_true_labels(wsis_info, preds_i)
+            true_labels_i = self._extract_true_labels(wsis_info)
             pred_labels_i = self._extract_pred_labels(preds_i, true_labels_i)
-            acc_i = self._calc_avg_class_acc(true_labels=true_labels_i, pred_labels=pred_labels_i)
+            macro_avg_acc_i = self._calc_macro_avg_class_acc(true_labels=true_labels_i, pred_labels=pred_labels_i)
+            micro_avg_acc_i = self._calc_micro_avg_class_acc(true_labels=true_labels_i, pred_labels=pred_labels_i)
+            partial_macro_avg_acc_i = self._calc_macro_avg_class_acc(true_labels=true_labels_i,
+                                                                     pred_labels=pred_labels_i, dropna=True)
+            partial_micro_avg_acc_i = self._calc_micro_avg_class_acc(true_labels=true_labels_i,
+                                                                     pred_labels=pred_labels_i, dropna=True)
             logging.info(f"predictions with confidence > {confidence_th_i} "
-                         f"has average class accuracy {acc_i:.5f}")
-            if acc_i > best_acc:
-                best_acc = acc_i
+                         f"has macro average class accuracy {macro_avg_acc_i:.5f} "
+                         f"({partial_macro_avg_acc_i:.5f} without unknowns), "
+                         f"micro average class accuracy {micro_avg_acc_i:.5f} "
+                         f"({partial_micro_avg_acc_i:.5f} without unknowns)")
+            if macro_avg_acc_i > best_macro_avg_acc:
+                best_macro_avg_acc = macro_avg_acc_i
                 best_confidence_th = confidence_th_i
         logging.info(f"best confidence threshold: {best_confidence_th}")
         return best_confidence_th
@@ -50,44 +58,72 @@ class FinalTester:
         """
         logging.info("Printing final test results...")
 
-        for predictions_t in self._search_predictions(inference_folder):
-            true_labels_t = self._extract_true_labels(wsis_info, predictions_t)
-            pred_labels_t = self._extract_pred_labels(predictions_t, true_labels_t)
-            avg_class_acc_t = self._calc_avg_class_acc(true_labels_t, pred_labels_t)
-            conf_matrix_t = self._conf_matrix(true_labels_t, pred_labels_t)
-            logging.info(f"test set has final avg class acc: {avg_class_acc_t:.5f}"
-                         f"\n{conf_matrix_t}")
+        for predictions_i in self._search_predictions(inference_folder):
+            true_labels_i = self._extract_true_labels(wsis_info)
+            pred_labels_i = self._extract_pred_labels(predictions_i, true_labels_i)
+            macro_avg_acc_i = self._calc_macro_avg_class_acc(true_labels=true_labels_i, pred_labels=pred_labels_i)
+            micro_avg_acc_i = self._calc_micro_avg_class_acc(true_labels=true_labels_i, pred_labels=pred_labels_i)
+            partial_macro_avg_acc_i = self._calc_macro_avg_class_acc(true_labels=true_labels_i,
+                                                                     pred_labels=pred_labels_i, dropna=True)
+            partial_micro_avg_acc_i = self._calc_micro_avg_class_acc(true_labels=true_labels_i,
+                                                                     pred_labels=pred_labels_i, dropna=True)
+            conf_matrix_i = self._conf_matrix(true_labels_i, pred_labels_i)
+            logging.info(f"test set has final "
+                         f"macro avg acc: {macro_avg_acc_i:.5f} ({partial_macro_avg_acc_i:.5f} without unknowns), "
+                         f"micro avg acc: {micro_avg_acc_i:.5f} ({partial_micro_avg_acc_i:.5f} without unknowns)"
+                         f"\n{conf_matrix_i}")
 
     @staticmethod
-    def _extract_true_labels(wsis_info, predictions_i) -> pd.Series:
-        return wsis_info.loc[wsis_info['id'].isin(predictions_i['image_id'].values),
-                             ['id', 'label']] \
-            .rename(columns={'id': 'image_id'}) \
-            .set_index('image_id') \
-            .squeeze() \
-            .sort_index()
+    def _extract_true_labels(wsis_info) -> pd.Series:
+        return wsis_info.loc[:, ['id', 'label']] \
+                        .rename(columns={'id': 'image_id'}) \
+                        .set_index('image_id') \
+                        .squeeze() \
+                        .sort_index()
 
     @staticmethod
-    def _extract_pred_labels(predictions_i, true_values: pd.Series) -> pd.Series:
-        return predictions_i.rename(columns={'prediction': 'label'}) \
-            .loc[predictions_i['image_id'].isin(true_values.index.values),
-                 ['image_id', 'label']] \
-            .set_index('image_id', drop=True) \
-            .squeeze() \
-            .sort_index()
+    def _extract_pred_labels(predictions, true_labels: pd.Series) -> pd.Series:
+        return predictions.rename(columns={'prediction': 'label'}) \
+                            .loc[:, ['image_id', 'label']] \
+                            .set_index('image_id', drop=True) \
+                            .squeeze() \
+                            .reindex(true_labels.index) \
+                            .sort_index()
 
-    def _calc_avg_class_acc(self, true_labels: pd.Series,
-                            pred_labels: pd.Series) -> Tuple[float, np.ndarray]:
+    def _calc_micro_avg_class_acc(self, true_labels: pd.Series, pred_labels: pd.Series,
+                                  dropna: bool=False) -> Tuple[float, np.ndarray]:
         """
-        Find the average class accuracy of the predictions.
+        Find the micro average class accuracy of the predictions.
 
         Args:
             true_labels: Ground truth label dictionary from filenames to label strings.
             pred_labels: Predicted label dictionary from filenames to label strings.
 
         Returns:
-            A tuple containing the average class accuracy and a confusion matrix.
+            A tuple containing the micro average class accuracy and a confusion matrix.
         """
+        if dropna:
+            pred_labels = pred_labels.dropna()
+            true_labels = true_labels.loc[pred_labels.index]
+        n_right_preds = pred_labels.eq(true_labels).sum()
+        n_examples = true_labels.shape[0]
+        return n_right_preds / n_examples
+
+    def _calc_macro_avg_class_acc(self, true_labels: pd.Series, pred_labels: pd.Series,
+                                  dropna: bool=False) -> Tuple[float, np.ndarray]:
+        """
+        Find the macro average class accuracy of the predictions.
+
+        Args:
+            true_labels: Ground truth label dictionary from filenames to label strings.
+            pred_labels: Predicted label dictionary from filenames to label strings.
+
+        Returns:
+            A tuple containing the macro average class accuracy and a confusion matrix.
+        """
+        if dropna:
+            pred_labels = pred_labels.dropna()
+            true_labels = true_labels.loc[pred_labels.index]
         n_right_preds_by_label = true_labels.loc[pred_labels.eq(true_labels)] \
                                             .value_counts() \
                                             .reindex(index=self._classes, fill_value=0)
@@ -108,7 +144,7 @@ class FinalTester:
         Returns:
             A tuple containing the confusion matrix.
         """
-        conf_matrix = confusion_matrix(y_true=true_labels, y_pred=pred_labels)
+        conf_matrix = confusion_matrix(y_true=true_labels, y_pred=pred_labels.fillna('Unknown'))
         return conf_matrix
 
     @staticmethod
