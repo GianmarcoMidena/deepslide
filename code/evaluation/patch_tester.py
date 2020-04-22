@@ -13,7 +13,7 @@ from code.utils import extract_subfolder_paths, search_folder_image_paths
 from code.models import resnet
 
 
-class Tester:
+class PatchTester:
     def __init__(self, checkpoints_folder: Path, auto_select: bool,
                  eval_model: Path, device: torch.device,
                  classes: List[str], num_classes: int,

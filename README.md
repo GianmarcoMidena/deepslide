@@ -31,10 +31,9 @@ Take a look at `code/config.py` before you begin to get a feel for what paramete
 2. Splitting
 3. Tiling
 4. Training
-5. Testing
-6. Grid Searching
+5. Testing on patches
+6. Whole-slide inference
 7. Visualization
-8. Final testing
 
 ## 1. Downscaling:
 
@@ -115,12 +114,13 @@ We recommend using ResNet-18 if you are training on a relatively small histopath
 CUDA_VISIBLE_DEVICES=0 python deepslide train --batch_size 32 --num_epochs 100 --save_interval 5
 ```
 
-## 5. Testing on WSI
+
+## 5. Testing on patches
 
 Run the model on all the patches for each WSI in the validation and test set.
 
 ```
-CUDA_VISIBLE_DEVICES=0 python deepslide test
+CUDA_VISIBLE_DEVICES=0 python deepslide test_on_patches
 ```
 
 We automatically choose the model with the best validation accuracy. You can also specify your own. You can change the thresholds used in the grid search by specifying the `threshold_search` variable in `code/config.py`.
@@ -135,17 +135,23 @@ CUDA_VISIBLE_DEVICES=0 python deepslide test --auto_select False
 ```
 
 
-## 6. Searching for Best Thresholds
+## 6. Whole-slide inference
 
-The simplest way to make a whole-slide inference is to choose the class with the most patch predictions. We can also implement thresholding on the patch level to throw out noise. To find the best thresholds, we perform a grid search. This function will generate csv files for each WSI with the predictions for each patch.
+The simplest way to make a whole-slide inference 
+is to choose the class with the most patch predictions. 
+We can also implement thresholding on the patch level to throw out noise. 
+To find the best thresholds, we perform a grid search. 
+This function will generate csv files for each WSI with the predictions for each patch.
+Do the final testing to compute the confusion matrix on the test set.
 
 ```
-python deepslide grid_search
+python deepslide test_on_slides
 ```
 
-**Inputs**: `preds_val`
+**Inputs**: `preds_val`, `preds_test`, `wsis_test.csv`, `inference_val` and `wsis_val.csv` (for the best thresholds)
 
-**Outputs**: `inference_val`
+**Outputs**: `inference_val`, `inference_test` and confusion matrix to stdout
+
 
 ## 7. Visualization
 
@@ -167,19 +173,6 @@ You can change the colors in `colors` in `code/config.py`
 ```
 python deepslide visualize --vis_test different_vis_test_directory
 ```
-
-
-## 8. Final Testing
-
-Do the final testing to compute the confusion matrix on the test set.
-
-```
-python deepslide final_test
-```
-
-**Inputs**: `preds_test`, `wsis_test.csv`, `inference_val` and `wsis_val.csv` (for the best thresholds)
-
-**Outputs**: `inference_test` and confusion matrix to stdout
 
 
 # Quick Run

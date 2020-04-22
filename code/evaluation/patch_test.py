@@ -1,9 +1,9 @@
 import pandas as pd
-from .tester import Tester
+from .patch_tester import PatchTester
 from ..configurer import Configurer
 
 
-def test(args):
+def patch_evaluate(args):
     args = Configurer(args)\
         .with_device()\
         .with_classes()\
@@ -12,16 +12,16 @@ def test(args):
 
     eval_model = args.checkpoints_folder.joinpath(args.checkpoint_file)
 
-    tester = Tester(auto_select=args.auto_select,
-                    batch_size=args.batch_size,
-                    checkpoints_folder=args.checkpoints_folder,
-                    classes=args.classes,
-                    device=args.device,
-                    eval_model=eval_model,
-                    num_classes=args.num_classes,
-                    num_layers=args.num_layers,
-                    num_workers=args.num_workers,
-                    pretrain=args.pretrain)
+    tester = PatchTester(auto_select=args.auto_select,
+                         batch_size=args.batch_size,
+                         checkpoints_folder=args.checkpoints_folder,
+                         classes=args.classes,
+                         device=args.device,
+                         eval_model=eval_model,
+                         num_classes=args.num_classes,
+                         num_layers=args.num_layers,
+                         num_workers=args.num_workers,
+                         pretrain=args.pretrain)
 
     val_wsis_info = pd.read_csv(args.wsis_val)
     test_wsis_info = pd.read_csv(args.wsis_test)
@@ -40,7 +40,7 @@ def test(args):
 
 
 def add_parser(subparsers):
-    subparsers.add_parser("test") \
+    subparsers.add_parser("test_on_patches") \
         .with_all_wsi() \
         .with_patches_eval_val() \
         .with_patches_eval_test() \
@@ -55,4 +55,4 @@ def add_parser(subparsers):
         .with_checkpoint_file() \
         .with_wsis_val() \
         .with_wsis_test() \
-        .set_defaults(func=test)
+        .set_defaults(func=patch_evaluate)

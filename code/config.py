@@ -5,7 +5,7 @@ from .downscaling import downscale
 from .splitting import split
 from .tiling import tile
 from .learning import train
-from .evaluation import test, final_test, grid_search
+from .evaluation import patch_test, whole_slide_inference
 from .visualization import visualize
 
 from .argument_parser import ArgumentParser
@@ -21,10 +21,9 @@ def config():
     split.add_parser(subparsers)
     tile.add_parser(subparsers)
     train.add_parser(subparsers)
-    test.add_parser(subparsers)
-    grid_search.add_parser(subparsers)
+    patch_test.add_parser(subparsers)
+    whole_slide_inference.add_parser(subparsers)
     visualize.add_parser(subparsers)
-    final_test.add_parser(subparsers)
     args = parser.parse_args()
 
     args.func(args)
