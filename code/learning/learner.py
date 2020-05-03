@@ -134,7 +134,7 @@ class Learner:
             self._train_helper(model=model,
                                dataloaders=dataloaders,
                                dataset_sizes=dataset_sizes,
-                               criterion=nn.CrossEntropyLoss(),
+                               loss_fn=self._search_loss_fn(),
                                optimizer=optimizer,
                                scheduler=scheduler,
                                start_epoch=start_epoch,
@@ -230,7 +230,7 @@ class Learner:
     def _train_helper(self, model: torchvision.models.resnet.ResNet,
                       dataloaders: Dict[str, torch.utils.data.DataLoader],
                       dataset_sizes: Dict[str, int],
-                      criterion: torch.nn.modules.loss, optimizer: torch.optim,
+                      loss_fn, optimizer: torch.optim,
                       scheduler: torch.optim.lr_scheduler, start_epoch: int,
                       writer: IO) -> None:
         """
@@ -240,7 +240,7 @@ class Learner:
             model: ResNet model for learning.
             dataloaders: Dataloaders for IO pipeline.
             dataset_sizes: Sizes of the learning and validation dataset.
-            criterion: Metric used for calculating loss.
+            loss_fn: Metric used for calculating loss.
             optimizer: Optimizer to use for gradient descent.
             scheduler: Scheduler to use for learning rate decay.
             start_epoch: Starting epoch for learning.
@@ -272,30 +272,30 @@ class Learner:
             train_running_corrects = 0
 
             # Train over all learning data.
-            for idx, (inputs, labels) in enumerate(dataloaders["train"]):
-                train_inputs = inputs.to(device=self._device)
-                train_labels = labels.to(device=self._device)
+            for idx, (train_inputs, true_labels) in enumerate(dataloaders["train"]):
+                train_inputs = train_inputs.to(device=self._device)
+                true_labels = true_labels.to(device=self._device)
                 optimizer.zero_grad()
 
                 # Forward and backpropagation.
                 with torch.set_grad_enabled(mode=True):
-                    train_outputs = model(train_inputs)
-                    __, train_preds = torch.max(train_outputs, dim=1)
-                    train_loss = criterion(input=train_outputs,
-                                           target=train_labels)
+                    train_logits = model(train_inputs).squeeze(dim=1)
+                    train_loss = loss_fn(logits=train_logits,
+                                         target=true_labels)
                     train_loss.backward()
                     optimizer.step()
 
                 # Update learning diagnostics.
                 train_running_loss += train_loss.item() * train_inputs.size(0)
+                pred_labels = self._extract_pred_labels(train_logits)
                 train_running_corrects += torch.sum(
-                    train_preds == train_labels.data, dtype=torch.double)
+                    pred_labels == true_labels.data, dtype=torch.double)
 
                 start = idx * self._batch_size
                 end = start + self._batch_size
 
-                train_all_labels[start:end] = train_labels.detach().cpu()
-                train_all_predicts[start:end] = train_preds.detach().cpu()
+                train_all_labels[start:end] = true_labels.detach().cpu()
+                train_all_predicts[start:end] = pred_labels.detach().cpu()
 
             self._calculate_confusion_matrix(all_labels=train_all_labels.numpy(),
                                              all_predicts=train_all_predicts.numpy(),
@@ -322,20 +322,20 @@ class Learner:
 
                 # Feed forward.
                 with torch.set_grad_enabled(mode=False):
-                    val_outputs = model(val_inputs)
-                    _, val_preds = torch.max(val_outputs, dim=1)
-                    val_loss = criterion(input=val_outputs, target=val_labels)
+                    val_logits = model(val_inputs).squeeze(dim=1)
+                    val_loss = loss_fn(logits=val_logits, target=val_labels)
 
                 # Update validation diagnostics.
                 val_running_loss += val_loss.item() * val_inputs.size(0)
-                val_running_corrects += torch.sum(val_preds == val_labels.data,
+                pred_labels = self._extract_pred_labels(val_logits)
+                val_running_corrects += torch.sum(pred_labels == val_labels.data,
                                                   dtype=torch.double)
 
                 start = idx * self._batch_size
                 end = start + self._batch_size
 
                 val_all_labels[start:end] = val_labels.detach().cpu()
-                val_all_predicts[start:end] = val_preds.detach().cpu()
+                val_all_predicts[start:end] = pred_labels.detach().cpu()
 
             self._calculate_confusion_matrix(all_labels=val_all_labels.numpy(),
                                              all_predicts=val_all_predicts.numpy(),
@@ -393,9 +393,29 @@ class Learner:
         logging.info(f"\nlearning complete in "
                      f"{self._format_time_period(learning_init_time, time.time())}")
 
+    def _extract_pred_labels(self, logits):
+        if self._num_classes > 2:
+            __, pred_labels = torch.max(logits, dim=1)
+        else:
+            probs = torch.sigmoid(logits)
+            pred_labels = (probs > 0.5).float()
+        return pred_labels
+
     @staticmethod
     def _format_time_period(start, end) -> str:
         period = end - start
         if period > 60:
             return f"{period / 60:.2f} minutes"
         return f"{period:.0f}s"
+
+    def _search_loss_fn(self):
+        if self._num_classes > 2:
+            loss_fn = lambda logits, target: nn.CrossEntropyLoss()(input=logits, target=target)
+        else:
+            loss_fn = self._binary_cross_entropy
+        return loss_fn
+
+    def _binary_cross_entropy(self, logits, target):
+        probs = nn.Sigmoid()(logits)
+        target = target.float()
+        return nn.BCELoss()(input=probs, target=target)

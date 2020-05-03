@@ -104,8 +104,7 @@ class PatchTester:
         batch_window_names = batch_window_names.astype(str).str.rsplit(".", n=1, expand=True).iloc[:, 0]
         x, y = batch_window_names.str.split("_", expand=True).iloc[:, -2:].values.T.tolist()
 
-        confidences, test_preds = \
-            torch.max(nn.Softmax(dim=1)(self._model(test_inputs.to(device=self._device))), dim=1)
+        test_preds, confidences = self._extract_pred_labels_and_confidences(test_inputs)
 
         batch_report = pd.DataFrame({"x": x, "y": y,
                                      "prediction": self._to_class_name(id=test_preds.tolist()),
@@ -113,6 +112,17 @@ class PatchTester:
 
         return report.append(batch_report,
                              sort=False, ignore_index=True)
+
+    def _extract_pred_labels_and_confidences(self, inputs):
+        logits = self._model(inputs.to(device=self._device)).squeeze(dim=1)
+        if self._num_classes > 2:
+            probs = nn.Softmax(dim=1)(logits)
+        else:
+            positive_class_probs = nn.Sigmoid()(logits)
+            negative_class_probs = 1 - positive_class_probs
+            probs = torch.stack([negative_class_probs, positive_class_probs], dim=1)
+        pred_confidences, pred_labels = torch.max(probs, dim=1)
+        return pred_labels, pred_confidences
 
     def _load_model(self):
         model_path = self._get_best_model(

@@ -9,6 +9,9 @@ def resnet(num_layers: int, num_classes: int, pretrain: bool):
         pretrain: Use pretrained ResNet weights.
     """
 
+    if num_classes < 3:
+        num_classes = 1
+
     assert num_layers in (
         18, 34, 50, 101, 152
     ), f"Invalid number of ResNet Layers. Must be one of [18, 34, 50, 101, 152] and not {num_layers}"
