@@ -342,8 +342,8 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_pretrain(self):
         # ImageNet pretrain?
         self.add_argument("--pretrain",
-                          type=bool,
                           default=False,
+                          action="store_true",
                           help="Use pretrained ResNet weights")
         return self
 
