@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import (List, Tuple)
 
-import tensorflow as tf
 import torch
 from PIL import Image
 from torchvision.transforms import ToTensor
@@ -68,23 +67,22 @@ def online_mean_and_std(paths: List[Path]) -> Tuple[List[float], List[float]]:
             A tuple containing the mean and standard deviation for the images over the channel, height, and width axes.
         """
         last_tot_pixels = 0
-        fst_moment = tf.zeros(3)
-        snd_moment = tf.zeros(3)
+        fst_moment = torch.zeros(3)
+        snd_moment = torch.zeros(3)
 
         for data in loader:
-            data = data.numpy()
             b, __, h, w = data.shape
             current_n_pixels = b * h * w
             tot_pixels = last_tot_pixels + current_n_pixels
             fst_moment = ((last_tot_pixels * fst_moment +
-                           tf.reduce_sum(data, axis=[0, 2, 3]))
+                           torch.sum(data, dim=[0, 2, 3]))
                           / tot_pixels)
             snd_moment = ((last_tot_pixels * snd_moment +
-                           tf.reduce_sum(data ** 2, axis=[0, 2, 3]))
+                           torch.sum(data ** 2, dim=[0, 2, 3]))
                           / tot_pixels)
             last_tot_pixels = tot_pixels
         mean = fst_moment.numpy().tolist()
-        std = tf.sqrt(snd_moment - fst_moment ** 2).numpy().tolist()
+        std = torch.sqrt(snd_moment - fst_moment ** 2).numpy().tolist()
         return mean, std
 
     return _online_mean_and_sd(

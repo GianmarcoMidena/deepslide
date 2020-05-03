@@ -15,7 +15,6 @@ This repository is a sliding window framework for classification of high resolut
 - [pandas](https://pandas.pydata.org/)
 - [PIL](https://pillow.readthedocs.io/en/5.3.x/)
 - [Python 3.6](https://www.python.org/downloads/release/python-360/)
-- [Tensorflow](https://www.tensorflow.org/)
 - [PyTorch](https://pytorch.org/)
 - [scikit-image](https://scikit-image.org/)
 - [scikit-learn](https://scikit-learn.org/stable/install.html)
