@@ -14,8 +14,14 @@ class Configurer:
         self._args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         return self
 
-    def with_classes(self):
-        self._args.classes = get_classes(folder=self._args.all_wsi)
+    def with_classes(self, binary_check=False):
+        if binary_check and self._args.positive_class and self._args.negative_class:
+                self._args.classes = [self._args.negative_class, self._args.positive_class]
+        else:
+            self._args.classes = get_classes(folder=self._args.all_wsi)
+            if binary_check and len(self._args.classes) < 3:
+                raise Exception(f'Attention: "positive_class" and "negative_class" options need to be specified for '
+                                f'binary classifiers!')
         return self
 
     def with_num_classes(self):

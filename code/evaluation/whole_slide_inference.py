@@ -6,7 +6,7 @@ from code.evaluation.whole_slide_inferencer import WholeSlideInferencer
 
 def final_test(args):
     args = Configurer(args) \
-        .with_classes() \
+        .with_classes(binary_check=True) \
         .build()
 
     val_wsis_info = pd.read_csv(args.wsis_val)
@@ -41,4 +41,6 @@ def add_parser(subparsers):
         .with_inference_test() \
         .with_preds_val() \
         .with_preds_test() \
+        .with_positive_class() \
+        .with_negative_class() \
         .set_defaults(func=final_test)

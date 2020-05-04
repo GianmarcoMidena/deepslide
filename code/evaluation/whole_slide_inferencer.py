@@ -55,9 +55,9 @@ class WholeSlideInferencer:
             logging.info(f"predictions with confidence > {confidence_th_i}, "
                          f"\n{metrics_i} "
                          f"\n{conf_matrix_i}")
-            f_score_avg = metrics_i['f_score_avg']
-            if f_score_avg > best_score:
-                best_score = f_score_avg
+            f_score = metrics_i['f_score']
+            if f_score > best_score or best_confidence_th is None:
+                best_score = f_score
                 best_confidence_th = confidence_th_i
         logging.info(f"best confidence threshold: {best_confidence_th}")
         return best_confidence_th
@@ -204,6 +204,28 @@ class WholeSlideInferencer:
         return float(confidence_th_perc) / 100
 
     def _calc_metrics(self, y_true, y_pred):
+        if len(self._classes) > 2:
+            return self._calc_multiclass_metrics(y_true, y_pred)
+        else:
+            return self._calc_binary_metrics(y_true, y_pred)
+
+    def _calc_binary_metrics(self, y_true, y_pred):
+        y_true = y_true[~y_pred.isna()]
+        y_pred = y_pred[~y_pred.isna()]
+        f_score = self._binary_f_score(y_true=y_true, y_pred=y_pred)
+        recall = self._binary_recall(y_true=y_true, y_pred=y_pred)
+        specificity = self._binary_specificity(y_true=y_true, y_pred=y_pred)
+        precision = self._binary_precision(y_true=y_true, y_pred=y_pred)
+        accuracy = accuracy_score(y_true=y_true, y_pred=y_pred)
+        return pd.Series({
+            'f_score': f_score,
+            'recall': recall,
+            'specificity': specificity,
+            'precision': precision,
+            'accuracy': accuracy
+        })
+
+    def _calc_multiclass_metrics(self, y_true, y_pred):
         y_pred = y_pred.fillna(self._UNKNOWN_CLASS)
         f_score_per_class = self._score_per_class(f1_score, y_true, y_pred)
         f_score_micro = f1_score(y_true=y_true, y_pred=y_pred, labels=self._classes, average='micro')
@@ -222,14 +244,26 @@ class WholeSlideInferencer:
         accuracy_avg = (accuracy_micro + accuracy_macro) / 2
         return pd.Series({
             **{f"f_score_{label}": score for label, score in f_score_per_class.items()},
-            'f_score_macro': f_score_macro, 'f_score_micro': f_score_micro, 'f_score_avg': f_score_avg,
+            'f_score_macro': f_score_macro, 'f_score_micro': f_score_micro, 'f_score': f_score_avg,
             **{f"precision_{label}": score for label, score in precision_per_class.items()},
-            'precision_macro': precision_macro, 'precision_micro': precision_micro, 'precision_avg': precision_avg,
+            'precision_macro': precision_macro, 'precision_micro': precision_micro, 'precision': precision_avg,
             **{f"recall_{label}": score for label, score in recall_per_class.items()},
-            'recall_macro': recall_macro, 'recall_micro': recall_micro, 'recall_avg': recall_avg,
-            'accuracy_micro': accuracy_micro, 'accuracy_macro': accuracy_macro, 'accuracy_avg': accuracy_avg
+            'recall_macro': recall_macro, 'recall_micro': recall_micro, 'recall': recall_avg,
+            'accuracy_micro': accuracy_micro, 'accuracy_macro': accuracy_macro, 'accuracy': accuracy_avg
         })
 
     def _score_per_class(self, score_fn, y_true, y_pred):
         score = score_fn(y_true=y_true, y_pred=y_pred, labels=self._classes, average=None)
         return {label_i: score_i for label_i, score_i in zip(self._classes, score)}
+
+    def _binary_f_score(self, y_true, y_pred):
+        return f1_score(y_true=y_true, y_pred=y_pred, pos_label=self._classes[1])
+
+    def _binary_recall(self, y_true, y_pred):
+        return recall_score(y_true=y_true, y_pred=y_pred, pos_label=self._classes[1])
+
+    def _binary_specificity(self, y_true, y_pred):
+        return recall_score(y_true=y_true, y_pred=y_pred, pos_label=self._classes[0])
+
+    def _binary_precision(self, y_true, y_pred):
+        return precision_score(y_true=y_true, y_pred=y_pred, pos_label=self._classes[1])

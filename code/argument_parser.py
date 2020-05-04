@@ -29,6 +29,22 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Location of the WSIs organized in subfolders by class")
         return self
 
+    def with_positive_class(self):
+        self.add_argument(
+            "--positive_class",
+            type=str,
+            required=False
+        )
+        return self
+
+    def with_negative_class(self):
+        self.add_argument(
+            "--negative_class",
+            type=str,
+            required=False
+        )
+        return self
+
     def with_original_slides(self):
         self.add_argument(
             "--original_slides",
