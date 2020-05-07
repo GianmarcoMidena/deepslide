@@ -138,23 +138,23 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Location to store the CSV file info for evaluation wsis")
         return self
 
-    def with_train_folder(self):
+    def with_train_patches_folder(self):
         # This is the input for model learning, automatically built.
         self.add_argument(
-            "--train_folder",
+            "--train_patches_folder",
             type=Path,
-            default=Path("train_folder"),
+            default=Path("train_patches"),
             help="Location of the automatically built learning input folder")
         return self
 
-    def with_patches_eval_train(self):
-        # Folders of patches by WSI in learning set, used for finding learning accuracy at WSI level.
+    def with_eval_patches_folder(self):
+        # Folders of patches by WSI in evaluation set, used for finding validation/test accuracy at WSI level.
         self.add_argument(
-            "--patches_eval_train",
+            "--eval_patches_folder",
             type=Path,
-            default=Path("patches_eval_train"),
+            default=Path("eval_patches"),
             help=
-            "Folders of patches by WSI in learning set, used for finding learning accuracy at WSI level"
+            "Folders of patches by WSI in evaluation set, used for finding validation/test accuracy at WSI level"
         )
         return self
 

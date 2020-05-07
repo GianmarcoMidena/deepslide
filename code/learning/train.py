@@ -39,7 +39,7 @@ def train(args):
             resume_checkpoint_path=resume_checkpoint_path,
             save_interval=args.save_interval,
             num_epochs=args.num_epochs,
-            train_folder=args.train_folder,
+            train_patches_folder=args.train_patches_folder,
             weight_decay=args.weight_decay,
             early_stopping_patience=args.early_stopping,
             train_wsis_info=train_wsis_info, val_wsis_info=val_wsis_info).train()
@@ -61,7 +61,7 @@ def add_parser(subparsers):
         .with_resume_checkpoint() \
         .with_save_interval() \
         .with_num_epochs() \
-        .with_train_folder() \
+        .with_train_patches_folder() \
         .with_weight_decay() \
         .with_early_stopping() \
         .with_checkpoint_file() \

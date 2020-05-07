@@ -18,7 +18,7 @@ from code.models import resnet
 
 
 class Learner:
-    def __init__(self, train_folder: Path, batch_size: int, num_workers: int,
+    def __init__(self, train_patches_folder: Path, batch_size: int, num_workers: int,
                  device: torch.device, classes: List[str], learning_rate: float,
                  weight_decay: float, learning_rate_decay: float,
                  resume_checkpoint: bool, resume_checkpoint_path: Path, log_csv: Path,
@@ -29,7 +29,7 @@ class Learner:
                  train_wsis_info: pd.DataFrame, val_wsis_info: pd.DataFrame):
         """
         Args:
-            train_folder: Location of the automatically built learning input folder.
+            train_patches_folder: Location of the automatically built learning input folder.
             batch_size: Mini-batch size to use for learning.
             num_workers: Number of workers to use for IO.
             device: Device to use for running model.
@@ -51,7 +51,7 @@ class Learner:
             num_epochs: Number of epochs for learning.
             save_interval: Number of epochs between saving checkpoints.
         """
-        self._train_folder = train_folder
+        self._train_patches_folder = train_patches_folder
         self._batch_size = batch_size
         self._num_workers = num_workers
         self._device = device
@@ -81,7 +81,7 @@ class Learner:
         data_transforms = self._get_data_transforms()
 
         image_datasets = {
-            x: datasets.ImageFolder(root=str(self._train_folder.joinpath(x)),
+            x: datasets.ImageFolder(root=str(self._train_patches_folder.joinpath(x)),
                                     transform=data_transforms[x])
             for x in ("train", "val")
         }
@@ -212,7 +212,7 @@ class Learner:
         """
         Print the configuration of the model.
         """
-        logging.info(f"train_folder: {self._train_folder}\n"
+        logging.info(f"train_patches_folder: {self._train_patches_folder}\n"
                      f"num_epochs: {self._num_epochs}\n"
                      f"num_layers: {self._num_layers}\n"
                      f"learning_rate: {self._learning_rate}\n"

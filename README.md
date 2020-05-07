@@ -62,7 +62,7 @@ Splits the data into `N` subsets.
 python deepslide split
 ```
 
-**Inputs**: `all_wsi`, `wsi_metadata` 
+**Inputs**: `all_wsi`, `wsi_metadata.csv` 
 
 **Outputs**: `wsi_part_1.csv`, ..., `wsi_part_N.csv`
 
@@ -89,9 +89,12 @@ python deepslide tile
 
 Note that this will take up a significant amount of space. Change `--num_train_per_class` to be smaller if you wish not to generate as many windows. If your histopathology images are H&E-stained, whitespace will automatically be filtered. Turn this off using the option `--type_histopath False`. Default overlapping area is 1/3 for test slides. Use 1 or 2 if your images are very large; you can also change this using the `--slide_overlap` option.
 
-**Inputs**: `all_wsi`, `wsi_part_1.csv`, ..., `wsi_part_N.csv`
+**Inputs**: `wsi_metadata.csv`, `wsi_part_1.csv`, ..., `wsi_part_N.csv`
 
-**Outputs**: `train_folder` (fed into model for training), `patches_eval_train` (for validation, sorted by WSI), `patches_eval_test` (for testing, sorted by WSI)
+**Outputs**: `train_patches_folder` (fed into model for training), `eval_patches_folder` (for validation and testing, sorted by WSI),
+`train_patches_part_1.csv`, ..., `train_patches_part_N.csv`, 
+`val_patches_part_1.csv`, ..., `val_patches_part_N.csv`,
+`eval_patches_part_1.csv`, ..., `eval_patches_part_N.csv`
 
 ### Example
 ```
@@ -107,7 +110,7 @@ CUDA_VISIBLE_DEVICES=0 python deepslide train
 
 We recommend using ResNet-18 if you are training on a relatively small histopathology dataset. You can change hyperparameters using the `argparse` flags. There is an option to retrain from a previous checkpoint. Model checkpoints are saved by default every epoch in `checkpoints`.
 
-**Inputs**: `train_folder`
+**Inputs**: `train_patches_folder`
 
 **Outputs**: `checkpoints`, `logs`
 
