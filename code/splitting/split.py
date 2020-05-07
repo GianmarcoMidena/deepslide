@@ -5,24 +5,22 @@ from code.splitting.wsi_splitter import WSISplitter
 def split(args):
     args = Configurer(args).build()
 
-    WSISplitter(all_wsi=args.all_wsi,
-                by_patient=args.by_patient,
-                wsis_info=args.wsis_info,
-                wsis_train=args.wsis_train,
-                wsis_test=args.wsis_test,
-                wsis_val=args.wsis_val,
-                test_wsi_per_class=args.test_wsi_per_class,
-                val_wsi_per_class=args.val_wsi_per_class).split()
+    WSISplitter(wsi_root=args.all_wsi,
+                group=args.group,
+                wsi_metadata=args.wsi_metadata,
+                path_column=args.path_column,
+                n_splits=args.n_splits,
+                output_dir=args.wsi_splits_dir,
+                seed=args.seed).split()
 
 
 def add_parser(subparsers):
     subparsers.add_parser("split") \
         .with_all_wsi() \
-        .with_by_patient() \
-        .with_wsis_info() \
-        .with_wsis_train() \
-        .with_wsis_val() \
-        .with_wsis_test() \
-        .with_val_wsi_per_class() \
-        .with_test_wsi_per_class() \
+        .with_n_splits() \
+        .with_group() \
+        .with_wsi_metadata() \
+        .with_path_column() \
+        .with_wsi_splits_dir() \
+        .with_seed() \
         .set_defaults(func=split)

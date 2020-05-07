@@ -58,37 +58,46 @@ class ArgumentParser(argparse.ArgumentParser):
                           type=int, required=True)
         return self
 
-    def with_wsis_info(self):
+    def with_wsi_metadata(self):
         self.add_argument(
-            "--wsis_info",
+            "--wsi_metadata",
             type=Path,
-            default=Path("wsis_info.csv"),
-            help="Location of a CSV file containing wsis metadata"
+            default=Path("wsi_metadata.csv"),
+            help="Location of a CSV file containing the wsi metadata"
         )
         return self
 
-    def with_by_patient(self):
+    def with_path_column(self):
         self.add_argument(
-            "--by_patient",
-            default=False,
-            action="store_true",
-            help="Split by patient")
+            "--path_column",
+            type=str,
+            default='path',
+            help="The path column name"
+        )
         return self
 
-    def with_val_wsi_per_class(self):
-        # For splitting into validation set.
-        self.add_argument("--val_wsi_per_class",
-                          type=int,
-                          default=20,
-                          help="Number of WSI per class to use in validation set")
+    def with_group(self):
+        self.add_argument(
+            "--group",
+            type=str,
+            required=False,
+            help="Keeps the samples belonging to the same group in the same partition")
         return self
 
-    def with_test_wsi_per_class(self):
-        # For splitting into evaluation set, remaining images used in train.
-        self.add_argument("--test_wsi_per_class",
-                          type=int,
-                          default=30,
-                          help="Number of WSI per class to use in test set")
+    def with_n_splits(self):
+        self.add_argument(
+            "--n_splits",
+            type=int,
+            required=False,
+            default=1)
+        return self
+
+    def with_wsi_splits_dir(self):
+        self.add_argument(
+            "--wsi_splits_dir",
+            type=Path,
+            default=Path("wsi_splits"),
+            help="path to the wsi splits directory")
         return self
 
     def with_num_workers(self):
@@ -466,5 +475,13 @@ class ArgumentParser(argparse.ArgumentParser):
             type=Path,
             default=Path("class_colors.json"),
             help="Location of a JSON file that maps each class with a color"
+        )
+        return self
+
+    def with_seed(self):
+        self.add_argument(
+            "--seed",
+            type=int,
+            default=3
         )
         return self

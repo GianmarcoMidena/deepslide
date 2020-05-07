@@ -19,6 +19,7 @@ This repository is a sliding window framework for classification of high resolut
 - [scikit-image](https://scikit-image.org/)
 - [scikit-learn](https://scikit-learn.org/stable/install.html)
 - [SciPy](https://www.scipy.org/)
+- [image-to-dataset](https://github.com/GianmarcoMidena/images-to-dataset)
 - [NVIDIA GPU](https://www.nvidia.com/en-us/)
 - [Ubuntu](https://ubuntu.com/)
 
@@ -53,23 +54,25 @@ Note that `original_slides` must contain subfolders of images labeled by class. 
 python deepslide downscale --downscale_factor 16
 ```
 
-## 2. Train-Val-Test Split:
+## 2. Splitting:
 
-Splits the data into a validation and test set. Default validation whole-slide images (WSI) per class is 20 and test images per class is 30. You can change these numbers by changing the `--val_wsi_per_class` and `--test_wsi_per_class` flags at runtime. You can skip this step if you did a custom split (for example, you need to split by patients).
+Splits the data into `N` subsets. 
 
 ```
 python deepslide split
 ```
 
-**Inputs**: `all_wsi`, `wsis_info` 
+**Inputs**: `all_wsi`, `wsi_metadata` 
 
-**Outputs**: `wsis_train.csv`, `wsis_val.csv`, `wsis_test.csv`
+**Outputs**: `wsi_part_1.csv`, ..., `wsi_part_N.csv`
 
-Note that `all_wsi` must contain subfolders of images labeled by class. For instance, if your two classes are `a` and `n`, you must have `a/*.jpg` with the images in class `a` and `n/*.jpg` with images in class `n`.
+Note that `all_wsi` must contain subfolders of images labeled by class. 
+For instance, if your two classes are `a` and `n`, 
+you must have `a/*.jpg` with the images in class `a` and `n/*.jpg` with images in class `n`.
 
 ### Example
 ```
-python deepslide split --by_patient --val_wsi_per_class 10 --test_wsi_per_class 20
+python deepslide split --n_splits 10
 ```
 
 ## 3. Tiling
@@ -86,7 +89,7 @@ python deepslide tile
 
 Note that this will take up a significant amount of space. Change `--num_train_per_class` to be smaller if you wish not to generate as many windows. If your histopathology images are H&E-stained, whitespace will automatically be filtered. Turn this off using the option `--type_histopath False`. Default overlapping area is 1/3 for test slides. Use 1 or 2 if your images are very large; you can also change this using the `--slide_overlap` option.
 
-**Inputs**: `all_wsi`, `wsis_train.csv`, `wsis_val.csv`, `wsis_test.csv`
+**Inputs**: `all_wsi`, `wsi_part_1.csv`, ..., `wsi_part_N.csv`
 
 **Outputs**: `train_folder` (fed into model for training), `patches_eval_train` (for validation, sorted by WSI), `patches_eval_test` (for testing, sorted by WSI)
 
