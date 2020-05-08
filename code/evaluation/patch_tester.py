@@ -6,11 +6,12 @@ from typing import List
 import pandas as pd
 import torch
 from torch import nn
-from torchvision import datasets, transforms
+from torchvision import transforms
 from ..compute_stats import online_mean_and_std
 
-from code.utils import extract_subfolder_paths, search_folder_image_paths
+from code.utils import search_folder_image_paths
 from code.models import resnet
+from ..dataset import Dataset
 
 
 class PatchTester:
@@ -48,7 +49,7 @@ class PatchTester:
             num_workers: Number of workers to use for IO.
         """
 
-    def predict(self, patches_eval_folder: Path, wsis_info: pd.DataFrame,
+    def predict(self, patches_metadata_paths: List[Path], wsi_metadata_paths: List[Path], class_idx_path: Path,
                 partition_name: str, output_folder: Path) -> None:
         """
         Args:
@@ -61,47 +62,48 @@ class PatchTester:
 
         start = time.time()
 
-        # Load the data for each folder.
-        image_folders = extract_subfolder_paths(folder=patches_eval_folder)
-
         # Where we want to write out the predictions.
         # Confirm the output directory exists.
         output_folder.mkdir(parents=True, exist_ok=True)
 
-        # For each WSI.
-        for image_folder in image_folders:
-            try:
-                self._predict_for_wsi(image_folder, output_folder, wsis_info)
-            except self._EmptyImageDirectoryException as e:
-                logging.error(str(e))
+        patches_metadata = pd.DataFrame()
+        for p in patches_metadata_paths:
+            patches_metadata = patches_metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
 
-        logging.info(f"time for {patches_eval_folder}: {time.time() - start:.2f} seconds")
+        slide_paths = [Path(wsi_path) for mp in wsi_metadata_paths
+                       for wsi_path in pd.read_csv(mp)['path']]
+        mean, std = online_mean_and_std(image_paths=slide_paths)
 
-    def _predict_for_wsi(self, patches_dir_path, output_folder, wsis_info: pd.DataFrame):
-        logging.info(patches_dir_path)
+        slide_ids = self._extract_slide_ids(patches_metadata)
+        for slide_id in slide_ids:
+            patches_metadata_i = patches_metadata.loc[patches_metadata['path'].str.contains(slide_id)]
+            self._predict_for_wsi(patches_metadata=patches_metadata_i, class_idx_path=class_idx_path,
+                                  slide_id=slide_id, mean=mean, std=std, output_folder=output_folder)
 
-        data = self._load_data(patches_dir_path, wsis_info)
+        logging.info(f"time for {patches_metadata_paths[0].parent.name}: {time.time() - start:.2f} seconds")
 
-        num_test_image_windows = len(data) * self._batch_size
+    def _predict_for_wsi(self, patches_metadata: pd.DataFrame, class_idx_path: Path,
+                         slide_id: str, mean, std, output_folder: Path):
+        eval_data = self._load_data(patches_metadata=patches_metadata, class_idx_path=class_idx_path,
+                                    mean=mean, std=std)
 
-        # Load the image names so we know the coordinates of the patches we are predicting.
-        patches_dir_path = patches_dir_path.joinpath(patches_dir_path.name)
-        window_names = pd.Series(search_folder_image_paths(folder=patches_dir_path))
+        num_test_image_windows = len(eval_data) * self._batch_size
 
-        logging.info(f"testing on {num_test_image_windows} crops from {patches_dir_path}")
+        logging.info(f"testing on {num_test_image_windows} crops for {slide_id} slide")
 
         report = pd.DataFrame(columns=["x", "y", "prediction", "confidence"])
 
-        for batch_index, (test_inputs, test_labels) in enumerate(data):
-            report = self._predict_for_batch_of_patches(batch_index, test_inputs, window_names, report)
+        patch_names = patches_metadata['path'].str.rsplit("/", n=1, expand=True)[1] \
+                                              .str.rsplit(".", n=1, expand=True)[0]
+        for batch_index, (eval_patches, _) in enumerate(eval_data):
+            report = self._predict_for_batch_of_patches(batch_index, eval_patches, patch_names, report)
 
-        report.to_csv(output_folder.joinpath(f"{patches_dir_path.name}.csv"), index=False, float_format='%.5f')
+        report.to_csv(output_folder.joinpath(f"{slide_id}.csv"), index=False, float_format='%.5f')
 
-    def _predict_for_batch_of_patches(self, batch_index: int, test_inputs, window_names: pd.Series,
+    def _predict_for_batch_of_patches(self, batch_index: int, test_inputs, patch_names: pd.Series,
                                       report: pd.DataFrame):
-        batch_window_names = window_names.iloc[batch_index * self._batch_size:
-                                               batch_index * self._batch_size + self._batch_size]
-        batch_window_names = batch_window_names.astype(str).str.rsplit(".", n=1, expand=True).iloc[:, 0]
+        batch_window_names = patch_names.iloc[batch_index * self._batch_size:
+                                              batch_index * self._batch_size + self._batch_size]
         x, y = batch_window_names.str.split("_", expand=True).iloc[:, -2:].values.T.tolist()
 
         test_preds, confidences = self._extract_pred_labels_and_confidences(test_inputs)
@@ -156,17 +158,19 @@ class PatchTester:
     def _to_class_name(self, id):
         return self._classes[id]
 
-    def _load_data(self, patches_dir_path, wsis_info: pd.DataFrame):
-        mean, std = online_mean_and_std(paths=wsis_info['path'].apply(Path).tolist())
+    def _load_data(self, patches_metadata: pd.DataFrame, mean, std,
+                   class_idx_path: Path):
         # Temporary fix. Need not to make folders with no crops.
         try:
+            dataset = Dataset(
+                metadata=patches_metadata,
+                class_idx_path=class_idx_path,
+                transform=transforms.Compose(transforms=[
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=mean, std=std)
+                ]))
             dataloader = torch.utils.data.DataLoader(
-                dataset=datasets.ImageFolder(
-                    root=str(patches_dir_path),
-                    transform=transforms.Compose(transforms=[
-                        transforms.ToTensor(),
-                        transforms.Normalize(mean=mean, std=std)
-                    ])),
+                dataset=dataset,
                 batch_size=self._batch_size,
                 shuffle=False,
                 num_workers=self._num_workers)
@@ -193,3 +197,8 @@ class PatchTester:
 
         def __init__(self):
             super().__init__(self._MESSAGE)
+
+    def _extract_slide_ids(self, patches_metadata: pd.DataFrame) -> List[str]:
+        return patches_metadata['path'].str.rsplit('/', n=1, expand=True)[1]\
+                                       .str.split('_', n=1, expand=True)[0]\
+                                       .unique().tolist()

@@ -8,14 +8,18 @@ import torch.utils.data
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, metadata_paths: List[Path], class_idx_path: Path, transform=None):
+    def __init__(self, class_idx_path: Path, metadata_paths: List[Path] = None, metadata: pd.DataFrame = None,
+                 transform=None):
         self._transform = transform
         self._class_idx = json.load(class_idx_path.open())
 
-        metadata = pd.DataFrame()
-        for p in metadata_paths:
-            metadata = metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
-        self._metadata = metadata
+        if metadata is not None:
+            self._metadata = metadata
+        else:
+            metadata = pd.DataFrame()
+            for p in metadata_paths:
+                metadata = metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
+            self._metadata = metadata
 
     def __len__(self) -> int:
         return self._metadata.shape[0]

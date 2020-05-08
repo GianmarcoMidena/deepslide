@@ -139,36 +139,14 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Location of the automatically built learning input folder")
         return self
 
-    def with_eval_patches_folder(self):
+    def with_eval_patches_root(self):
         # Folders of patches by WSI in evaluation set, used for finding validation/test accuracy at WSI level.
         self.add_argument(
-            "--eval_patches_folder",
+            "--eval_patches_root",
             type=Path,
             default=Path("eval_patches"),
             help=
             "Folders of patches by WSI in evaluation set, used for finding validation/test accuracy at WSI level"
-        )
-        return self
-
-    def with_patches_eval_val(self):
-        # Folders of patches by WSI in validation set, used for finding validation accuracy at WSI level.
-        self.add_argument(
-            "--patches_eval_val",
-            type=Path,
-            default=Path("patches_eval_val"),
-            help=
-            "Folders of patches by WSI in validation set, used for finding validation accuracy at WSI level"
-        )
-        return self
-
-    def with_patches_eval_test(self):
-        # Folders of patches by WSI in test set, used for finding test accuracy at WSI level.
-        self.add_argument(
-            "--patches_eval_test",
-            type=Path,
-            default=Path("patches_eval_test"),
-            help=
-            "Folders of patches by WSI in evaluation set, used for finding test accuracy at WSI level"
         )
         return self
 

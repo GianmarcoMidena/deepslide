@@ -8,12 +8,12 @@ from torchvision.transforms import ToTensor
 Image.MAX_IMAGE_PIXELS = None
 
 
-def online_mean_and_std(paths: List[Path]) -> Tuple[List[float], List[float]]:
+def online_mean_and_std(image_paths: List[Path]) -> Tuple[List[float], List[float]]:
     """
     Compute the mean and standard deviation of the images found in paths.
 
     Args:
-        paths: List of paths of image files.
+        image_paths: List of paths of image files.
 
     Returns:
         A tuple containing the mean and standard deviation for the images over the channel, height, and width axes.
@@ -87,7 +87,7 @@ def online_mean_and_std(paths: List[Path]) -> Tuple[List[float], List[float]]:
 
     return _online_mean_and_sd(
         loader=torch.utils.data.DataLoader(dataset=MyDataset(
-            paths=paths),
+            paths=image_paths),
             batch_size=1,
             num_workers=1,
             shuffle=False))

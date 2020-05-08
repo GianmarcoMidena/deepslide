@@ -54,8 +54,8 @@ def train(args):
                 num_epochs=args.num_epochs,
                 weight_decay=args.weight_decay,
                 early_stopping_patience=args.early_stopping,
-                train_metadata_paths=train_wsi_metadata_paths_i,
-                val_metadata_paths=val_wsi_metadata_paths_i,
+                train_wsi_metadata_paths=train_wsi_metadata_paths_i,
+                val_wsi_metadata_paths=val_wsi_metadata_paths_i,
                 train_patch_metadata_paths=train_patch_metadata_paths_i,
                 val_patch_metadata_paths=val_patch_metadata_paths_i,
                 class_idx_path=args.class_idx).train()
