@@ -396,22 +396,13 @@ class ArgumentParser(argparse.ArgumentParser):
             "Folder for outputting WSI learning predictions based on each threshold")
         return self
 
-    def with_inference_val(self):
+    def with_inference_root(self):
         self.add_argument(
-            "--inference_val",
+            "--inference_root",
             type=Path,
-            default=Path("inference_val"),
+            default=Path("inference"),
             help=
-            "Folder for outputting WSI validation predictions based on each threshold")
-        return self
-
-    def with_inference_test(self):
-        self.add_argument(
-            "--inference_test",
-            type=Path,
-            default=Path("inference_test"),
-            help="Folder for outputting WSI evaluation predictions based on each threshold"
-        )
+            "Folder for outputting WSI validation/testing predictions")
         return self
 
     def with_vis_train(self):

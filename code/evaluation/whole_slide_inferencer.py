@@ -14,17 +14,18 @@ class WholeSlideInferencer:
     # Threshold values to search.
     _CONFIDENCE_THRESHOLDS = (0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 
-    def __init__(self, wsis_info: pd.DataFrame, patches_pred_folder: Path, inference_folder: Path, classes: List[str]):
+    def __init__(self, wsi_metadata_paths: List[Path], patches_pred_folder: Path, inference_folder: Path,
+                 classes: List[str]):
         """
         Args:
             patches_pred_folder: Path containing the predictions.
             inference_folder: Folder containing the predicted labels.
             classes: Names of the classes in the dataset.
         """
-        self._wsis_info = wsis_info
         self._patches_pred_folder = patches_pred_folder
         self._inference_folder = inference_folder
         self._classes = classes
+        self._true_labels = self._extract_true_labels(wsi_metadata_paths)
 
     def search_confidence_thesholds(self) -> None:
         """
@@ -48,10 +49,9 @@ class WholeSlideInferencer:
         best_score = 0
         best_confidence_th = None
         for preds_i, confidence_th_i in self._search_predictions_and_confidence_th():
-            true_labels_i = self._extract_true_labels()
-            pred_labels_i = self._extract_pred_labels(preds_i, true_labels_i)
-            metrics_i = self._calc_metrics(true_labels_i, pred_labels_i)
-            conf_matrix_i = self._conf_matrix(true_labels_i, pred_labels_i)
+            pred_labels_i = self._extract_pred_labels(predictions=preds_i, true_labels=self._true_labels)
+            metrics_i = self._calc_metrics(y_true=self._true_labels, y_pred=pred_labels_i)
+            conf_matrix_i = self._conf_matrix(true_labels=self._true_labels, pred_labels=pred_labels_i)
             logging.info(f"predictions with confidence > {confidence_th_i}, "
                          f"\n{metrics_i} "
                          f"\n{conf_matrix_i}")
@@ -62,20 +62,20 @@ class WholeSlideInferencer:
         logging.info(f"best confidence threshold: {best_confidence_th}")
         return best_confidence_th
 
-    def print_final_test_results(self) -> None:
+    def final_test_results(self):
         """
         Print the final accuracy and confusion matrix.
         """
-        logging.info("Printing final test results...")
+        logging.info("Computing final test results...")
 
         for predictions_i in self._search_predictions():
-            true_labels_i = self._extract_true_labels()
-            pred_labels_i = self._extract_pred_labels(predictions_i, true_labels_i)
-            metrics_i = self._calc_metrics(true_labels_i, pred_labels_i)
-            conf_matrix_i = self._conf_matrix(true_labels_i, pred_labels_i)
+            pred_labels_i = self._extract_pred_labels(predictions=predictions_i, true_labels=self._true_labels)
+            metrics_i = self._calc_metrics(y_true=self._true_labels, y_pred=pred_labels_i)
+            conf_matrix_i = self._conf_matrix(true_labels=self._true_labels, pred_labels=pred_labels_i)
             logging.info(f"test set has final "
                          f"\n{metrics_i} "
                          f"\n{conf_matrix_i}")
+            return metrics_i, conf_matrix_i
 
     def report_predictions(self, confidence_th: float) -> None:
         """
@@ -141,12 +141,16 @@ class WholeSlideInferencer:
             **{f'count_{_class}_patch_preds': class_to_count.loc[_class] for _class in self._classes}
         }
 
-    def _extract_true_labels(self) -> pd.Series:
-        return self._wsis_info.loc[:, ['id', 'label']] \
-                        .rename(columns={'id': 'image_id'}) \
-                        .set_index('image_id') \
-                        .squeeze() \
-                        .sort_index()
+    def _extract_true_labels(self, wsi_metadata_paths) -> pd.Series:
+        wsi_metadata = pd.DataFrame()
+        for p in wsi_metadata_paths:
+            wsi_metadata = wsi_metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
+
+        return wsi_metadata.loc[:, ['id', 'label']] \
+                           .rename(columns={'id': 'image_id'}) \
+                           .set_index('image_id') \
+                           .squeeze() \
+                           .sort_index()
 
     @staticmethod
     def _extract_pred_labels(predictions, true_labels: pd.Series) -> pd.Series:
