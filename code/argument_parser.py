@@ -116,14 +116,6 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Size of the patches extracted from the WSI")
         return self
 
-    def with_wsis_train(self):
-        # Where the CSV file labels will go.
-        self.add_argument("--wsis_train",
-                          type=Path,
-                          default=Path("wsis_train.csv"),
-                          help="Location to store the CSV file info for learning wsis")
-        return self
-
     def with_wsis_val(self):
         self.add_argument("--wsis_val",
                           type=Path,
@@ -138,10 +130,10 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Location to store the CSV file info for evaluation wsis")
         return self
 
-    def with_train_patches_folder(self):
+    def with_train_patches_root(self):
         # This is the input for model learning, automatically built.
         self.add_argument(
-            "--train_patches_folder",
+            "--train_patches_root",
             type=Path,
             default=Path("train_patches"),
             help="Location of the automatically built learning input folder")
@@ -347,9 +339,9 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Number of epochs between saving checkpoints")
         return self
 
-    def with_checkpoints_folder(self):
+    def with_checkpoints_root(self):
         # Where models are saved.
-        self.add_argument("--checkpoints_folder",
+        self.add_argument("--checkpoints_root",
                           type=Path,
                           default=Path("checkpoints"),
                           help="Directory to save model checkpoints to")
@@ -372,8 +364,8 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Use pretrained ResNet weights")
         return self
 
-    def with_log_folder(self):
-        self.add_argument("--log_folder",
+    def with_log_root(self):
+        self.add_argument("--log_root",
                           type=Path,
                           default=Path("logs"),
                           help="Directory to save logs to")
@@ -467,6 +459,15 @@ class ArgumentParser(argparse.ArgumentParser):
             type=Path,
             default=Path("vis_test"),
             help="Folder for outputting the WSI evaluation prediction visualizations")
+        return self
+
+    def with_class_idx(self):
+        self.add_argument(
+            "--class_idx",
+            type=Path,
+            default=Path("class_idx.json"),
+            help="Location of a JSON file that maps each class with a numeric index"
+        )
         return self
 
     def with_class_colors(self):

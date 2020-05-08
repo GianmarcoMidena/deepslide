@@ -27,19 +27,21 @@ def tile(args):
     eval_step_size = int(args.patch_size / args.test_patch_overlap_factor)
 
     metadata_paths = sorted(list(args.wsi_splits_dir.glob("*.csv")))
-    n_splits = len(metadata_paths)
+    tot_splits = len(metadata_paths)
     n_test_splits = 1
-    num_train_patches_per_class_per_split = args.num_train_patches_per_class // (n_splits - n_test_splits)
+    n_train_splits = tot_splits - n_test_splits
+    num_train_patches_per_class_per_split = args.num_train_patches_per_class // n_train_splits
     step_size_finder = StepSizeFinder(target_n_patches=num_train_patches_per_class_per_split,
                                       patch_size=args.patch_size, patch_extractor=patch_extractor)
 
     wsi_metadata = pd.read_csv(args.wsi_metadata).set_index('id', drop=True)
 
     for metadata_path_i in metadata_paths:
-        part_id = metadata_path_i.stem.replace(f"wsi_part_", "")
+        part_id = metadata_path_i.stem.split("_")[-1]
+        part_name = f"part_{part_id}"
         metadata_i = pd.read_csv(metadata_path_i)
         train_part_name = f'training (part {part_id})'
-        train_dir_i = train_patches_folder.joinpath(f"part_{part_id}")
+        train_dir_i = train_patches_folder.joinpath(part_name)
         patch_extractor.extract_all_by_class(wsis_info=metadata_i, partition_name=train_part_name,
                                             output_folder=train_dir_i, step_size_finder=step_size_finder)
         PatchesBalancer(image_dir=train_dir_i, partition_name=train_part_name).balance_by_class()
@@ -53,7 +55,7 @@ def tile(args):
 
         logging.info("Generating validation patches for training...")
         val_part_name = f'validation (part {part_id})'
-        val_dir_i = val_patches_folder.joinpath(f"part_{part_id}")
+        val_dir_i = val_patches_folder.joinpath(part_name)
         patch_extractor.extract_all_by_class(wsis_info=metadata_i, partition_name=val_part_name,
                                             output_folder=val_dir_i, step_size=val_step_size)
 
@@ -65,7 +67,7 @@ def tile(args):
 
         logging.info(f"Generating patches for evaluation...")
         eval_part_name = f'evaluation (part {part_id})'
-        eval_dir_i = eval_patches_folder.joinpath(f"part_{part_id}")
+        eval_dir_i = eval_patches_folder.joinpath(part_name)
         patch_extractor.extract_all(image_paths=_extract_image_paths(metadata_i), step_size=eval_step_size,
                                    partition_name=eval_part_name, output_folder=eval_dir_i, by_wsi=True)
 
@@ -84,7 +86,7 @@ def add_parser(subparsers):
     subparsers.add_parser("tile") \
         .with_wsi_metadata() \
         .with_wsi_splits_dir() \
-        .with_train_patches_folder() \
+        .with_train_patches_root() \
         .with_num_train_patches_per_class() \
         .with_num_workers() \
         .with_patch_size() \

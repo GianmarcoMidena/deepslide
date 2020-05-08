@@ -9,16 +9,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 from torch.optim import lr_scheduler
-from torchvision import (datasets, transforms)
+from torchvision import (transforms)
 
 from code.compute_stats import online_mean_and_std
+from code.dataset import Dataset
 from code.learning.early_stopper import EarlyStopper
 from code.learning.random90rotation import Random90Rotation
 from code.models import resnet
 
 
 class Learner:
-    def __init__(self, train_patches_folder: Path, batch_size: int, num_workers: int,
+    def __init__(self, batch_size: int, num_workers: int,
                  device: torch.device, classes: List[str], learning_rate: float,
                  weight_decay: float, learning_rate_decay: float,
                  resume_checkpoint: bool, resume_checkpoint_path: Path, log_csv: Path,
@@ -26,10 +27,11 @@ class Learner:
                  color_jitter_hue: float, color_jitter_saturation: float, num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
                  num_epochs: int, save_interval: int, early_stopping_patience: int,
-                 train_wsis_info: pd.DataFrame, val_wsis_info: pd.DataFrame):
+                 train_metadata_paths: List[Path], val_metadata_paths: List[Path],
+                 train_patch_metadata_paths: List[Path], val_patch_metadata_paths: List[Path],
+                 class_idx_path: Path):
         """
         Args:
-            train_patches_folder: Location of the automatically built learning input folder.
             batch_size: Mini-batch size to use for learning.
             num_workers: Number of workers to use for IO.
             device: Device to use for running model.
@@ -51,7 +53,6 @@ class Learner:
             num_epochs: Number of epochs for learning.
             save_interval: Number of epochs between saving checkpoints.
         """
-        self._train_patches_folder = train_patches_folder
         self._batch_size = batch_size
         self._num_workers = num_workers
         self._device = device
@@ -73,17 +74,21 @@ class Learner:
         self._num_epochs = num_epochs
         self._save_interval = save_interval
         self._early_stopping_patience = early_stopping_patience
-        self._train_wsis_info = train_wsis_info
-        self._val_wsis_info = val_wsis_info
+        self._train_wsi_metadata_paths = train_metadata_paths
+        self._val_wsi_metadata_paths = val_metadata_paths
+        self._train_patch_metadata_paths = train_patch_metadata_paths
+        self._val_patch_metadata_paths = val_patch_metadata_paths
+        self._class_idx_path = class_idx_path
 
     def train(self) -> None:
         # Loading in the data.
         data_transforms = self._get_data_transforms()
 
         image_datasets = {
-            x: datasets.ImageFolder(root=str(self._train_patches_folder.joinpath(x)),
-                                    transform=data_transforms[x])
-            for x in ("train", "val")
+            'train': Dataset(metadata_paths=self._train_patch_metadata_paths, transform=data_transforms['train'],
+                             class_idx_path=self._class_idx_path),
+            'val': Dataset(metadata_paths=self._val_patch_metadata_paths, transform=data_transforms['val'],
+                           class_idx_path=self._class_idx_path)
         }
 
         dataloaders = {
@@ -183,8 +188,10 @@ class Learner:
         Returns:
             A dictionary mapping learning and validation strings to data transforms.
         """
-        train_image_paths = self._train_wsis_info['path'].apply(Path).tolist()
-        val_image_paths = self._val_wsis_info['path'].apply(Path).tolist()
+        train_image_paths = [Path(wsi_path) for mp in self._train_wsi_metadata_paths
+                             for wsi_path in pd.read_csv(mp)['path']]
+        val_image_paths = [Path(wsi_path) for mp in self._val_wsi_metadata_paths
+                           for wsi_path in pd.read_csv(mp)['path']]
         train_mean, train_std = online_mean_and_std(paths=train_image_paths)
         val_mean, val_std = online_mean_and_std(paths=val_image_paths)
 
@@ -212,8 +219,7 @@ class Learner:
         """
         Print the configuration of the model.
         """
-        logging.info(f"train_patches_folder: {self._train_patches_folder}\n"
-                     f"num_epochs: {self._num_epochs}\n"
+        logging.info(f"num_epochs: {self._num_epochs}\n"
                      f"num_layers: {self._num_layers}\n"
                      f"learning_rate: {self._learning_rate}\n"
                      f"batch_size: {self._batch_size}\n"

@@ -110,7 +110,7 @@ CUDA_VISIBLE_DEVICES=0 python deepslide train
 
 We recommend using ResNet-18 if you are training on a relatively small histopathology dataset. You can change hyperparameters using the `argparse` flags. There is an option to retrain from a previous checkpoint. Model checkpoints are saved by default every epoch in `checkpoints`.
 
-**Inputs**: `train_patches_folder`
+**Inputs**: `wsi_part_1.csv`, ..., `wsi_part_N.csv`, `train_patches_part_1.csv`, ..., `train_patches_part_N.csv`
 
 **Outputs**: `checkpoints`, `logs`
 

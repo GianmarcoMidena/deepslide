@@ -51,7 +51,7 @@ def add_parser(subparsers):
         .with_num_layers() \
         .with_num_workers() \
         .with_pretrain() \
-        .with_checkpoints_folder() \
+        .with_checkpoints_root() \
         .with_checkpoint_file() \
         .with_wsis_val() \
         .with_wsis_test() \
