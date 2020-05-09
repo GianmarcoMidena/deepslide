@@ -19,7 +19,7 @@ This repository is a sliding window framework for classification of high resolut
 - [scikit-image](https://scikit-image.org/)
 - [scikit-learn](https://scikit-learn.org/stable/install.html)
 - [SciPy](https://www.scipy.org/)
-- [image-to-dataset](https://github.com/GianmarcoMidena/images-to-dataset)
+- [images-to-dataset](https://github.com/GianmarcoMidena/images-to-dataset)
 - [NVIDIA GPU](https://www.nvidia.com/en-us/)
 - [Ubuntu](https://ubuntu.com/)
 

@@ -12,59 +12,58 @@ def train(args):
     wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
     patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*part_*.csv")))
     tot_splits = len(wsi_metadata_paths)
-    n_test_splits = 1
-    n_train_splits = tot_splits - n_test_splits
-    train_wsi_metadata_paths = wsi_metadata_paths[:-n_test_splits]
-    train_patch_metadata_paths = patch_metadata_paths[:-n_test_splits]
 
-    part_ids = list(range(n_train_splits))
+    outer_part_ids = list(range(tot_splits))
 
     fixed_folds = args.fixed_folds
     if fixed_folds:
-        part_ids = [part_id for part_id in part_ids if part_id+1 in fixed_folds]
+        outer_part_ids = [part_id for part_id in outer_part_ids if part_id+1 in fixed_folds]
 
-    for i in part_ids:
-        part_name = f'part_{i+1}'
+    for i in outer_part_ids:
+        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
 
-        val_wsi_metadata_paths_i = [train_wsi_metadata_paths[i]]
-        val_patch_metadata_paths_i = [train_patch_metadata_paths[i]]
-        train_wsi_metadata_paths_i = train_wsi_metadata_paths[:i] + train_wsi_metadata_paths[i+1:]
-        train_patch_metadata_paths_i = train_patch_metadata_paths[:i] + train_patch_metadata_paths[i + 1:]
+        for j in inner_part_ids:
+            part_name = f'part_{i+1}_{j+1}'
 
-        checkpoints_folder_i = args.checkpoints_root.joinpath(part_name)
-        # Only used is resume_checkpoint is True.
-        resume_checkpoint_path_i = checkpoints_folder_i.joinpath(args.checkpoint_file)
+            val_wsi_metadata_paths = [wsi_metadata_paths[j]]
+            val_patch_metadata_paths = [patch_metadata_paths[j]]
+            train_wsi_metadata_paths = wsi_metadata_paths[:j] + wsi_metadata_paths[j+1:]
+            train_patch_metadata_paths = patch_metadata_paths[:j] + patch_metadata_paths[j+1:]
 
-        # Named with date and time.
-        log_csv_i = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
+            checkpoints_folder_i = args.checkpoints_root.joinpath(part_name)
+            # Only used is resume_checkpoint is True.
+            resume_checkpoint_path_i = checkpoints_folder_i.joinpath(args.checkpoint_file)
 
-        # Training the ResNet.
-        Learner(batch_size=args.batch_size,
-                checkpoints_folder=checkpoints_folder_i,
-                classes=args.classes,
-                color_jitter_brightness=args.color_jitter_brightness,
-                color_jitter_contrast=args.color_jitter_contrast,
-                color_jitter_hue=args.color_jitter_hue,
-                color_jitter_saturation=args.color_jitter_saturation,
-                device=args.device,
-                learning_rate=args.learning_rate,
-                learning_rate_decay=args.learning_rate_decay,
-                log_csv=log_csv_i,
-                num_classes=args.num_classes,
-                num_layers=args.num_layers,
-                num_workers=args.num_workers,
-                pretrain=args.pretrain,
-                resume_checkpoint=args.resume_checkpoint,
-                resume_checkpoint_path=resume_checkpoint_path_i,
-                save_interval=args.save_interval,
-                num_epochs=args.num_epochs,
-                weight_decay=args.weight_decay,
-                early_stopping_patience=args.early_stopping,
-                train_wsi_metadata_paths=train_wsi_metadata_paths_i,
-                val_wsi_metadata_paths=val_wsi_metadata_paths_i,
-                train_patch_metadata_paths=train_patch_metadata_paths_i,
-                val_patch_metadata_paths=val_patch_metadata_paths_i,
-                class_idx_path=args.class_idx).train()
+            # Named with date and time.
+            log_csv_i = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
+
+            # Training the ResNet.
+            Learner(batch_size=args.batch_size,
+                    checkpoints_folder=checkpoints_folder_i,
+                    classes=args.classes,
+                    color_jitter_brightness=args.color_jitter_brightness,
+                    color_jitter_contrast=args.color_jitter_contrast,
+                    color_jitter_hue=args.color_jitter_hue,
+                    color_jitter_saturation=args.color_jitter_saturation,
+                    device=args.device,
+                    learning_rate=args.learning_rate,
+                    learning_rate_decay=args.learning_rate_decay,
+                    log_csv=log_csv_i,
+                    num_classes=args.num_classes,
+                    num_layers=args.num_layers,
+                    num_workers=args.num_workers,
+                    pretrain=args.pretrain,
+                    resume_checkpoint=args.resume_checkpoint,
+                    resume_checkpoint_path=resume_checkpoint_path_i,
+                    save_interval=args.save_interval,
+                    num_epochs=args.num_epochs,
+                    weight_decay=args.weight_decay,
+                    early_stopping_patience=args.early_stopping,
+                    train_wsi_metadata_paths=train_wsi_metadata_paths,
+                    val_wsi_metadata_paths=val_wsi_metadata_paths,
+                    train_patch_metadata_paths=train_patch_metadata_paths,
+                    val_patch_metadata_paths=val_patch_metadata_paths,
+                    class_idx_path=args.class_idx).train()
 
 
 def add_parser(subparsers):
@@ -91,4 +90,5 @@ def add_parser(subparsers):
               .with_checkpoint_file() \
               .with_log_root() \
               .with_class_idx() \
+              .with_fixed_folds() \
               .set_defaults(func=train)
