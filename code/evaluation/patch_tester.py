@@ -200,5 +200,5 @@ class PatchTester:
 
     def _extract_slide_ids(self, patches_metadata: pd.DataFrame) -> List[str]:
         return patches_metadata['path'].str.rsplit('/', n=1, expand=True)[1]\
-                                       .str.split('_', n=1, expand=True)[0]\
+                                       .str.rsplit('_', n=2, expand=True)[0]\
                                        .unique().tolist()

@@ -9,8 +9,8 @@ def patch_evaluate(args):
         .with_num_classes()\
         .build()
 
-    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*.csv")))
-    patch_metadata_paths = sorted(list(args.eval_patches_root.glob("*.csv")))
+    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
+    patch_metadata_paths = sorted(list(args.eval_patches_root.glob("*part_*.csv")))
     tot_splits = len(wsi_metadata_paths)
     n_test_splits = 1
     n_train_splits = tot_splits - n_test_splits

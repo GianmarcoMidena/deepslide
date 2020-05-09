@@ -13,7 +13,7 @@ def final_test(args):
     val_inference_root = args.inference_root.joinpath('val')
     test_inference_root = args.inference_root.joinpath('test')
 
-    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*.csv")))
+    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
     tot_splits = len(wsi_metadata_paths)
     n_test_splits = 1
     n_train_splits = tot_splits - n_test_splits
@@ -58,13 +58,12 @@ def final_test(args):
         all_test_metrics = all_test_metrics.append(metrics_i, ignore_index=True, sort=False)
         if all_conf_matrices is None:
             all_conf_matrices = conf_matrix_i
-            sample_size = conf_matrix_i.sum().sum()
         else:
             all_conf_matrices += conf_matrix_i
 
     logging.info("Overall final test metrics"
                  f"\n{all_test_metrics.mean(axis=0)} "
-                 f"\n{(all_conf_matrices/all_conf_matrices.sum().sum())*sample_size}")
+                 f"\n{all_conf_matrices/all_conf_matrices.sum().sum()}")
 
 
 def add_parser(subparsers):

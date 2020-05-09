@@ -148,7 +148,6 @@ class PatchExtractor(ABC):
         output_folder.mkdir(parents=True, exist_ok=True)
         if by_wsi:
             output_subsubfolder = output_folder.joinpath(image_name)
-            output_subsubfolder = output_subsubfolder.joinpath(output_subsubfolder.name)
             output_subsubfolder.mkdir(parents=True, exist_ok=True)
             output_path = output_subsubfolder.joinpath(
                 f"{image_name}_{x_start}_{y_start}.{self._image_ext}")

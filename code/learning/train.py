@@ -9,15 +9,21 @@ def train(args):
         .with_num_classes() \
         .build()
 
-    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*.csv")))
-    patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*.csv")))
+    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
+    patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*part_*.csv")))
     tot_splits = len(wsi_metadata_paths)
     n_test_splits = 1
     n_train_splits = tot_splits - n_test_splits
     train_wsi_metadata_paths = wsi_metadata_paths[:-n_test_splits]
     train_patch_metadata_paths = patch_metadata_paths[:-n_test_splits]
 
-    for i in range(n_train_splits):
+    part_ids = list(range(n_train_splits))
+
+    fixed_folds = args.fixed_folds
+    if fixed_folds:
+        part_ids = [part_id for part_id in part_ids if part_id+1 in fixed_folds]
+
+    for i in part_ids:
         part_name = f'part_{i+1}'
 
         val_wsi_metadata_paths_i = [train_wsi_metadata_paths[i]]

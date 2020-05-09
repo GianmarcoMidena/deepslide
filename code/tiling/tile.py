@@ -26,7 +26,7 @@ def tile(args):
     val_step_size = int(args.patch_size / args.val_patch_overlap_factor)
     eval_step_size = int(args.patch_size / args.test_patch_overlap_factor)
 
-    metadata_paths = sorted(list(args.wsi_splits_dir.glob("*.csv")))
+    metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
     tot_splits = len(metadata_paths)
     n_test_splits = 1
     n_train_splits = tot_splits - n_test_splits
@@ -48,7 +48,6 @@ def tile(args):
 
         report_train_part_i = pd.DataFrame([str(x) for c in train_dir_i.iterdir()
                                             for x in c.iterdir()], columns=['path'])
-        report_train_part_i['path'] = report_train_part_i['path']
         report_train_part_i['label'] = report_train_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
         report_train_part_i = report_train_part_i.sample(frac=1., replace=False, random_state=3)
         report_train_part_i.to_csv(train_patches_folder.joinpath(f"train_patches_part_{part_id}.csv"), index=False)
@@ -61,7 +60,6 @@ def tile(args):
 
         report_val_part_i = pd.DataFrame([str(x) for c in val_dir_i.iterdir()
                                           for x in c.iterdir()], columns=['path'])
-        report_val_part_i['path'] = report_val_part_i['path']
         report_val_part_i['label'] = report_val_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
         report_val_part_i.to_csv(val_patches_folder.joinpath(f"val_patches_part_{part_id}.csv"), index=False)
 
@@ -71,12 +69,10 @@ def tile(args):
         patch_extractor.extract_all(image_paths=_extract_image_paths(metadata_i), step_size=eval_step_size,
                                     partition_name=eval_part_name, output_folder=eval_dir_i, by_wsi=True)
 
-        report_eval_part_i = pd.DataFrame([str(z) for c in eval_dir_i.iterdir()
-                                           for x in c.iterdir()
-                                           for z in x.iterdir()], columns=['path'])
-        report_eval_part_i['path'] = report_eval_part_i['path']
+        report_eval_part_i = pd.DataFrame([str(x) for c in eval_dir_i.iterdir()
+                                           for x in c.iterdir()], columns=['path'])
         report_eval_part_i['id'] = report_eval_part_i['path'].str.rsplit('/', n=1, expand=True)[1] \
-            .str.split('_', n=1, expand=True)[0]
+            .str.rsplit('_', n=2, expand=True)[0]
         report_eval_part_i = report_eval_part_i.set_index('id', drop=True)
         report_eval_part_i = report_eval_part_i.join(wsi_metadata['label'], how='inner', sort=False)
         report_eval_part_i.to_csv(eval_patches_folder.joinpath(f"eval_patches_part_{part_id}.csv"), index=False)

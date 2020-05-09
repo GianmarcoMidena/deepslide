@@ -25,7 +25,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--all_wsi",
             type=Path,
-            default=Path("all_wsi"),
+            default=Path("slides"),
             help="Location of the WSIs organized in subfolders by class")
         return self
 
@@ -62,7 +62,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--wsi_metadata",
             type=Path,
-            default=Path("wsi_metadata.csv"),
+            default=Path("slides/metadata.csv"),
             help="Location of a CSV file containing the wsi metadata"
         )
         return self
@@ -92,11 +92,19 @@ class ArgumentParser(argparse.ArgumentParser):
             default=1)
         return self
 
+    def with_fixed_folds(self):
+        self.add_argument(
+            "--fixed_folds",
+            type=int,
+            nargs='*',
+            required=False)
+        return self
+
     def with_wsi_splits_dir(self):
         self.add_argument(
             "--wsi_splits_dir",
             type=Path,
-            default=Path("wsi_splits"),
+            default=Path("slides"),
             help="path to the wsi splits directory")
         return self
 
@@ -135,7 +143,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--train_patches_root",
             type=Path,
-            default=Path("train_patches"),
+            default=Path("patches/train"),
             help="Location of the automatically built learning input folder")
         return self
 
@@ -144,7 +152,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--eval_patches_root",
             type=Path,
-            default=Path("eval_patches"),
+            default=Path("patches/eval"),
             help=
             "Folders of patches by WSI in evaluation set, used for finding validation/test accuracy at WSI level"
         )
@@ -364,7 +372,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--preds_train",
             type=Path,
-            default=Path("preds_train"),
+            default=Path("preds/train"),
             help="Directory for outputting learning prediction CSV files")
         return self
 
@@ -373,7 +381,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--preds_val",
             type=Path,
-            default=Path("preds_val"),
+            default=Path("preds/val"),
             help="Directory for outputting validation prediction CSV files")
         return self
 
@@ -382,7 +390,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--preds_test",
             type=Path,
-            default=Path("preds_test"),
+            default=Path("preds/test"),
             help="Directory for outputting evaluation prediction CSV files")
         return self
 
@@ -391,7 +399,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--inference_train",
             type=Path,
-            default=Path("inference_train"),
+            default=Path("inference/train"),
             help=
             "Folder for outputting WSI learning predictions based on each threshold")
         return self
@@ -410,7 +418,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--vis_train",
             type=Path,
-            default=Path("vis_train"),
+            default=Path("vis/train"),
             help="Folder for outputting the WSI learning prediction visualizations")
         return self
 
@@ -418,7 +426,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--vis_val",
             type=Path,
-            default=Path("vis_val"),
+            default=Path("vis/val"),
             help="Folder for outputting the WSI validation prediction visualizations")
         return self
 
@@ -426,7 +434,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--vis_test",
             type=Path,
-            default=Path("vis_test"),
+            default=Path("vis/test"),
             help="Folder for outputting the WSI evaluation prediction visualizations")
         return self
 
