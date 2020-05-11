@@ -17,13 +17,13 @@ class ArgumentParser(argparse.ArgumentParser):
                          conflict_handler=conflict_handler,
                          add_help=add_help, allow_abbrev=allow_abbrev)
 
-    def with_all_wsi(self):
+    def with_slides_root(self):
         # Input folders for learning images.
         # Must contain subfolders of images labelled by class.
         # If your two classes are 'a' and 'n', you must have a/*.jpg with the images in class a and
         # n/*.jpg with the images in class n.
         self.add_argument(
-            "--all_wsi",
+            "--slides",
             type=Path,
             default=Path("slides"),
             help="Location of the WSIs organized in subfolders by class")
@@ -58,9 +58,9 @@ class ArgumentParser(argparse.ArgumentParser):
                           type=int, required=True)
         return self
 
-    def with_wsi_metadata(self):
+    def with_slides_metadata(self):
         self.add_argument(
-            "--wsi_metadata",
+            "--slides_metadata",
             type=Path,
             default=Path("slides/metadata.csv"),
             help="Location of a CSV file containing the wsi metadata"
@@ -100,9 +100,9 @@ class ArgumentParser(argparse.ArgumentParser):
             required=False)
         return self
 
-    def with_wsi_splits_dir(self):
+    def with_slides_splits_dir(self):
         self.add_argument(
-            "--wsi_splits_dir",
+            "--slides_splits_dir",
             type=Path,
             default=Path("slides"),
             help="path to the wsi splits directory")
@@ -124,17 +124,17 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Size of the patches extracted from the WSI")
         return self
 
-    def with_wsis_val(self):
-        self.add_argument("--wsis_val",
+    def with_slides_val(self):
+        self.add_argument("--slides_val",
                           type=Path,
-                          default=Path("wsis_val.csv"),
+                          default=Path("slides_val.csv"),
                           help="Location to store the CSV file info for validation wsis")
         return self
 
-    def with_wsis_test(self):
-        self.add_argument("--wsis_test",
+    def with_slides_test(self):
+        self.add_argument("--slides_test",
                           type=Path,
-                          default=Path("wsis_test.csv"),
+                          default=Path("slides_test.csv"),
                           help="Location to store the CSV file info for evaluation wsis")
         return self
 
@@ -211,8 +211,8 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Image extension for saving patches")
         return self
 
-    def with_original_wsi_ext(self):
-        self.add_argument("--original_wsi_ext",
+    def with_original_slide_ext(self):
+        self.add_argument("--original_slide_ext",
                           type=str,
                           default="svs",
                           help="Original WSI extension")

@@ -13,13 +13,13 @@ from code.utils import search_folder_image_paths, extract_subfolder_paths
 class SlidesDownscaler:
     _RGB_EXTENSIONS = ['jpeg', 'jpg']
 
-    def __init__(self, original_wsi_root: Path, new_wsi_root: Path,
-                 original_wsi_ext: str, new_wsi_ext: str,
+    def __init__(self, original_slides_root: Path, new_slides_root: Path,
+                 original_slide_ext: str, new_slide_ext: str,
                  downscale_factor: int, num_workers: str):
-        self._original_wsis_root = original_wsi_root
-        self._new_wsis_root = new_wsi_root
-        self._original_wsi_ext = original_wsi_ext
-        self._new_wsi_ext = new_wsi_ext
+        self._original_slides_root = original_slides_root
+        self._new_slides_root = new_slides_root
+        self._original_slide_ext = original_slide_ext
+        self._new_slide_ext = new_slide_ext
         self._downscale_factor = downscale_factor
         self._num_workers = num_workers
 
@@ -40,7 +40,7 @@ class SlidesDownscaler:
                          f"out of {tot_slides_to_downscale} total slides")
 
     def _search_slide_paths_for_downscaling(self):
-        class_paths = extract_subfolder_paths(self._original_wsis_root)
+        class_paths = extract_subfolder_paths(self._original_slides_root)
         slide_paths = []
         for class_path in class_paths:
             slide_paths += search_folder_image_paths(class_path)
@@ -63,13 +63,13 @@ class SlidesDownscaler:
         return downscaled_slide_path.is_file()
 
     def _calc_new_wsi_path(self, original_wsi_path):
-        return self._new_wsis_root.joinpath(original_wsi_path.parent.name) \
-                                  .joinpath(f"{original_wsi_path.stem}.{self._new_wsi_ext}")
+        return self._new_slides_root.joinpath(original_wsi_path.parent.name) \
+                                  .joinpath(f"{original_wsi_path.stem}.{self._new_slide_ext}")
 
     def __downscale_slide(self, slide: OpenSlide):
         level = slide.get_best_level_for_downsample(self._downscale_factor)
         whole_slide_image = slide.read_region(location=(0, 0), level=level, size=slide.level_dimensions[level])
-        if self._new_wsi_ext.lower() in self._RGB_EXTENSIONS:
+        if self._new_slide_ext.lower() in self._RGB_EXTENSIONS:
             whole_slide_image = whole_slide_image.convert("RGB")
         new_dimensions = self._calc_downscaled_sizes(slide)
         return whole_slide_image.resize(new_dimensions, PIL.Image.ANTIALIAS)

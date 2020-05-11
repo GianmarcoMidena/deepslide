@@ -32,7 +32,7 @@ Take a look at `code/config.py` before you begin to get a feel for what paramete
 3. Tiling
 4. Training
 5. Testing on patches
-6. Whole-slide inference
+6. Slide inference
 7. Visualization
 
 ## 1. Downscaling:
@@ -45,7 +45,7 @@ python deepslide downscale
 
 **Inputs**: `original_slides`, `downscale_factor` 
 
-**Outputs**: `all_wsi`
+**Outputs**: `slides`
 
 Note that `original_slides` must contain subfolders of images labeled by class. For instance, if your two classes are `a` and `n`, you must have `a/*.jpg` with the images in class `a` and `n/*.svs` with images in class `n`.
 
@@ -62,11 +62,11 @@ Splits the data into `N` subsets.
 python deepslide split
 ```
 
-**Inputs**: `all_wsi`, `wsi_metadata.csv` 
+**Inputs**: `slides`, `slides_metadata.csv` 
 
-**Outputs**: `wsi_part_1.csv`, ..., `wsi_part_N.csv`
+**Outputs**: `slides_part_1.csv`, ..., `slides_part_N.csv`
 
-Note that `all_wsi` must contain subfolders of images labeled by class. 
+Note that `slides` must contain subfolders of images labeled by class. 
 For instance, if your two classes are `a` and `n`, 
 you must have `a/*.jpg` with the images in class `a` and `n/*.jpg` with images in class `n`.
 
@@ -89,7 +89,7 @@ python deepslide tile
 
 Note that this will take up a significant amount of space. Change `--num_train_per_class` to be smaller if you wish not to generate as many windows. If your histopathology images are H&E-stained, whitespace will automatically be filtered. Turn this off using the option `--type_histopath False`. Default overlapping area is 1/3 for test slides. Use 1 or 2 if your images are very large; you can also change this using the `--slide_overlap` option.
 
-**Inputs**: `wsi_metadata.csv`, `wsi_part_1.csv`, ..., `wsi_part_N.csv`
+**Inputs**: `slides/metadata.csv`, `slides_part_1.csv`, ..., `slides_part_N.csv`
 
 **Outputs**: `train_patches_folder` (fed into model for training), `eval_patches_folder` (for validation and testing, sorted by WSI),
 `train_patches_part_1.csv`, ..., `train_patches_part_N.csv`, 
@@ -110,7 +110,7 @@ CUDA_VISIBLE_DEVICES=0 python deepslide train
 
 We recommend using ResNet-18 if you are training on a relatively small histopathology dataset. You can change hyperparameters using the `argparse` flags. There is an option to retrain from a previous checkpoint. Model checkpoints are saved by default every epoch in `checkpoints`.
 
-**Inputs**: `wsi_part_1.csv`, ..., `wsi_part_N.csv`, `train_patches_part_1.csv`, ..., `train_patches_part_N.csv`
+**Inputs**: `slides_part_1.csv`, ..., `slides_part_N.csv`, `train_patches_part_1.csv`, ..., `train_patches_part_N.csv`
 
 **Outputs**: `checkpoints`, `logs`
 
@@ -140,9 +140,9 @@ CUDA_VISIBLE_DEVICES=0 python deepslide test --auto_select False
 ```
 
 
-## 6. Whole-slide inference
+## 6. Slide inference
 
-The simplest way to make a whole-slide inference 
+The simplest way to make a slide inference 
 is to choose the class with the most patch predictions. 
 We can also implement thresholding on the patch level to throw out noise. 
 To find the best thresholds, we perform a grid search. 
@@ -153,7 +153,7 @@ Do the final testing to compute the confusion matrix on the test set.
 python deepslide test_on_slides
 ```
 
-**Inputs**: `preds_val`, `preds_test`, `wsis_test.csv`, `inference_val` and `wsis_val.csv` (for the best thresholds)
+**Inputs**: `preds_val`, `preds_test`, `slides_test.csv`, `inference_val` and `slides_val.csv` (for the best thresholds)
 
 **Outputs**: `inference_val`, `inference_test` and confusion matrix to stdout
 
@@ -166,7 +166,7 @@ A good way to see what the network is looking at is to visualize the predictions
 python deepslide visualize
 ```
 
-**Inputs**: `wsis_val.csv`, `wsis_test.csv`, `preds_val`
+**Inputs**: `slides_val.csv`, `slides_test.csv`, `preds_val`
 
 **Outputs**: `vis_val`
 

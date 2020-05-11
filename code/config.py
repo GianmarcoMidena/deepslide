@@ -5,7 +5,7 @@ from .downscaling import downscale
 from .splitting import split
 from .tiling import tile
 from .learning import train
-from .evaluation import patch_test, whole_slide_inference
+from .evaluation import patch_test, slide_inference
 from .visualization import visualize
 
 from .argument_parser import ArgumentParser
@@ -22,7 +22,7 @@ def config():
     tile.add_parser(subparsers)
     train.add_parser(subparsers)
     patch_test.add_parser(subparsers)
-    whole_slide_inference.add_parser(subparsers)
+    slide_inference.add_parser(subparsers)
     visualize.add_parser(subparsers)
     args = parser.parse_args()
 

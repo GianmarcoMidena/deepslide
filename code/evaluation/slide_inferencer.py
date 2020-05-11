@@ -8,13 +8,13 @@ from sklearn.metrics import (confusion_matrix, f1_score, precision_score, recall
                              balanced_accuracy_score)
 
 
-class WholeSlideInferencer:
+class SlideInferencer:
     _UNKNOWN_CLASS = 'unknown'
 
     # Threshold values to search.
     _CONFIDENCE_THRESHOLDS = (0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 
-    def __init__(self, wsi_metadata_paths: List[Path], patches_pred_folder: Path, inference_folder: Path,
+    def __init__(self, slides_metadata_paths: List[Path], patches_pred_folder: Path, inference_folder: Path,
                  classes: List[str]):
         """
         Args:
@@ -25,7 +25,7 @@ class WholeSlideInferencer:
         self._patches_pred_folder = patches_pred_folder
         self._inference_folder = inference_folder
         self._classes = classes
-        self._true_labels = self._extract_true_labels(wsi_metadata_paths)
+        self._true_labels = self._extract_true_labels(slides_metadata_paths)
 
     def search_confidence_thesholds(self) -> None:
         """
@@ -141,12 +141,12 @@ class WholeSlideInferencer:
             **{f'count_{_class}_patch_preds': class_to_count.loc[_class] for _class in self._classes}
         }
 
-    def _extract_true_labels(self, wsi_metadata_paths) -> pd.Series:
-        wsi_metadata = pd.DataFrame()
-        for p in wsi_metadata_paths:
-            wsi_metadata = wsi_metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
+    def _extract_true_labels(self, slides_metadata_paths) -> pd.Series:
+        slides_metadata = pd.DataFrame()
+        for p in slides_metadata_paths:
+            slides_metadata = slides_metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
 
-        return wsi_metadata.loc[:, ['id', 'label']] \
+        return slides_metadata.loc[:, ['id', 'label']] \
                            .rename(columns={'id': 'image_id'}) \
                            .set_index('image_id') \
                            .squeeze() \

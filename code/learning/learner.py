@@ -27,7 +27,7 @@ class Learner:
                  color_jitter_hue: float, color_jitter_saturation: float, num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
                  num_epochs: int, save_interval: int, early_stopping_patience: int,
-                 train_wsi_metadata_paths: List[Path], val_wsi_metadata_paths: List[Path],
+                 train_slides_metadata_paths: List[Path], val_slides_metadata_paths: List[Path],
                  train_patch_metadata_paths: List[Path], val_patch_metadata_paths: List[Path],
                  class_idx_path: Path):
         """
@@ -74,8 +74,8 @@ class Learner:
         self._num_epochs = num_epochs
         self._save_interval = save_interval
         self._early_stopping_patience = early_stopping_patience
-        self._train_wsi_metadata_paths = train_wsi_metadata_paths
-        self._val_wsi_metadata_paths = val_wsi_metadata_paths
+        self._train_slides_metadata_paths = train_slides_metadata_paths
+        self._val_slides_metadata_paths = val_slides_metadata_paths
         self._train_patch_metadata_paths = train_patch_metadata_paths
         self._val_patch_metadata_paths = val_patch_metadata_paths
         self._class_idx_path = class_idx_path
@@ -188,10 +188,10 @@ class Learner:
         Returns:
             A dictionary mapping learning and validation strings to data transforms.
         """
-        train_image_paths = [Path(wsi_path) for mp in self._train_wsi_metadata_paths
-                             for wsi_path in pd.read_csv(mp)['path']]
-        val_image_paths = [Path(wsi_path) for mp in self._val_wsi_metadata_paths
-                           for wsi_path in pd.read_csv(mp)['path']]
+        train_image_paths = [Path(slide_path) for mp in self._train_slides_metadata_paths
+                             for slide_path in pd.read_csv(mp)['path']]
+        val_image_paths = [Path(slide_path) for mp in self._val_slides_metadata_paths
+                           for slide_path in pd.read_csv(mp)['path']]
         train_mean, train_std = online_mean_and_std(image_paths=train_image_paths)
         val_mean, val_std = online_mean_and_std(image_paths=val_image_paths)
 

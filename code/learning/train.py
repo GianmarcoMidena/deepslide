@@ -9,9 +9,9 @@ def train(args):
         .with_num_classes() \
         .build()
 
-    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
+    slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
     patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*part_*.csv")))
-    tot_splits = len(wsi_metadata_paths)
+    tot_splits = len(slides_metadata_paths)
 
     outer_part_ids = list(range(tot_splits))
 
@@ -25,9 +25,9 @@ def train(args):
         for j in inner_part_ids:
             part_name = f'part_{i+1}_{j+1}'
 
-            val_wsi_metadata_paths = [wsi_metadata_paths[j]]
+            val_slides_metadata_paths = [slides_metadata_paths[j]]
             val_patch_metadata_paths = [patch_metadata_paths[j]]
-            train_wsi_metadata_paths = wsi_metadata_paths[:j] + wsi_metadata_paths[j+1:]
+            train_slides_metadata_paths = slides_metadata_paths[:j] + slides_metadata_paths[j+1:]
             train_patch_metadata_paths = patch_metadata_paths[:j] + patch_metadata_paths[j+1:]
 
             checkpoints_folder_i = args.checkpoints_root.joinpath(part_name)
@@ -59,8 +59,8 @@ def train(args):
                     num_epochs=args.num_epochs,
                     weight_decay=args.weight_decay,
                     early_stopping_patience=args.early_stopping,
-                    train_wsi_metadata_paths=train_wsi_metadata_paths,
-                    val_wsi_metadata_paths=val_wsi_metadata_paths,
+                    train_slides_metadata_paths=train_slides_metadata_paths,
+                    val_slides_metadata_paths=val_slides_metadata_paths,
                     train_patch_metadata_paths=train_patch_metadata_paths,
                     val_patch_metadata_paths=val_patch_metadata_paths,
                     class_idx_path=args.class_idx).train()
@@ -68,8 +68,8 @@ def train(args):
 
 def add_parser(subparsers):
     subparsers.add_parser("train") \
-              .with_all_wsi() \
-              .with_wsi_splits_dir() \
+              .with_slides_root() \
+              .with_slides_splits_dir() \
               .with_batch_size() \
               .with_color_jitter_brightness() \
               .with_color_jitter_contrast() \

@@ -18,7 +18,7 @@ class Configurer:
         if binary_check and self._args.positive_class and self._args.negative_class:
                 self._args.classes = [self._args.negative_class, self._args.positive_class]
         else:
-            self._args.classes = get_classes(folder=self._args.all_wsi)
+            self._args.classes = get_classes(folder=self._args.slides)
             if binary_check and len(self._args.classes) < 3:
                 raise Exception(f'Attention: "positive_class" and "negative_class" options need to be specified for '
                                 f'binary classifiers!')

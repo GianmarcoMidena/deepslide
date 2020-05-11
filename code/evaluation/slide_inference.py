@@ -2,7 +2,7 @@ import pandas as pd
 import logging
 
 from code.configurer import Configurer
-from code.evaluation.whole_slide_inferencer import WholeSlideInferencer
+from code.evaluation.slide_inferencer import SlideInferencer
 
 
 def final_test(args):
@@ -13,12 +13,12 @@ def final_test(args):
     val_inference_root = args.inference_root.joinpath('val')
     test_inference_root = args.inference_root.joinpath('test')
 
-    wsi_metadata_paths = sorted(list(args.wsi_splits_dir.glob("*part_*.csv")))
-    tot_splits = len(wsi_metadata_paths)
+    slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
+    tot_splits = len(slides_metadata_paths)
     n_test_splits = 1
     n_train_splits = tot_splits - n_test_splits
-    train_wsi_metadata_paths = wsi_metadata_paths[:-n_test_splits]
-    test_wsi_metadata_paths = wsi_metadata_paths[-n_test_splits:]
+    train_slides_metadata_paths = slides_metadata_paths[:-n_test_splits]
+    test_slides_metadata_paths = slides_metadata_paths[-n_test_splits:]
 
     all_test_metrics = pd.DataFrame()
     all_conf_matrices = None
@@ -33,17 +33,17 @@ def final_test(args):
         val_inference_fold_i = val_inference_root.joinpath(part_name)
         test_inference_fold_i = test_inference_root.joinpath(part_name)
 
-        val_wsi_metadata_paths_i = [train_wsi_metadata_paths[i]]
+        val_slides_metadata_paths_i = [train_slides_metadata_paths[i]]
 
-        validator = WholeSlideInferencer(wsi_metadata_paths=val_wsi_metadata_paths_i,
-                                         patches_pred_folder=val_patches_pred_folder_i,
-                                         inference_folder=val_inference_fold_i,
-                                         classes=args.classes)
+        validator = SlideInferencer(slides_metadata_paths=val_slides_metadata_paths_i,
+                                    patches_pred_folder=val_patches_pred_folder_i,
+                                    inference_folder=val_inference_fold_i,
+                                    classes=args.classes)
 
-        tester = WholeSlideInferencer(wsi_metadata_paths=test_wsi_metadata_paths,
-                                      patches_pred_folder=test_patches_pred_folder_i,
-                                      inference_folder=test_inference_fold_i,
-                                      classes=args.classes)
+        tester = SlideInferencer(slides_metadata_paths=test_slides_metadata_paths,
+                                 patches_pred_folder=test_patches_pred_folder_i,
+                                 inference_folder=test_inference_fold_i,
+                                 classes=args.classes)
 
         # Searching over thresholds for filtering noise.
         validator.search_confidence_thesholds()
@@ -67,9 +67,9 @@ def final_test(args):
 
 
 def add_parser(subparsers):
-    subparsers.add_parser("whole_slide_inference") \
-        .with_all_wsi() \
-        .with_wsi_splits_dir() \
+    subparsers.add_parser("slide_inference") \
+        .with_slides_root() \
+        .with_slides_splits_dir() \
         .with_inference_root() \
         .with_preds_val() \
         .with_preds_test() \

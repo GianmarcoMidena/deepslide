@@ -24,7 +24,7 @@ class Viewer:
         self._colors_path = colors_path
         self._patch_size = patch_size
 
-    def visualize(self, wsis_info: pd.DataFrame, partition_name: str,
+    def visualize(self, slides_info: pd.DataFrame, partition_name: str,
                   preds_folder: Path, vis_folder: Path) -> None:
         """
         Args:
@@ -35,22 +35,22 @@ class Viewer:
 
         class_colors = self._load_class_colors()
 
-        n_slides = wsis_info.shape[0]
+        n_slides = slides_info.shape[0]
         # Find list of WSI.
         logging.info(f"{n_slides} {partition_name} whole slides found")
 
         # Go over all of the WSI.
-        for _, wsi_info in wsis_info.iterrows():
+        for _, slide_info in slides_info.iterrows():
             # Read in the image.
-            whole_slide = imread(uri=wsi_info['path'])[..., [0, 1, 2]]
-            logging.info(f"visualizing {wsi_info['id']} "
+            whole_slide = imread(uri=slide_info['path'])[..., [0, 1, 2]]
+            logging.info(f"visualizing {slide_info['id']} "
                          f"of shape {whole_slide.shape}")
 
             assert whole_slide.shape[2] == 3, \
                 f"Expected 3 channels while your image has {whole_slide.shape[2]} channels."
 
             # Save it.
-            output_file_name = f"{wsi_info['id']}_predictions.jpg"
+            output_file_name = f"{slide_info['id']}_predictions.jpg"
             output_path = vis_folder.joinpath(output_file_name)
 
             # Confirm the output directory exists.
@@ -59,12 +59,12 @@ class Viewer:
             # Temporary fix. Need not to make folders with no crops.
             try:
                 # Add the predictions to the image and save it.
-                patch_preds = pd.read_csv(preds_folder.joinpath(f"{wsi_info['id']}.csv"))
-                wsi_with_patch_preds = self._decorate_wsi_with_patch_preds(patch_predictions=patch_preds,
-                                                                           whole_slide=whole_slide,
-                                                                           class_colors=class_colors,
-                                                                           patch_size=self._patch_size)
-                imsave(output_path, wsi_with_patch_preds)
+                patch_preds = pd.read_csv(preds_folder.joinpath(f"{slide_info['id']}.csv"))
+                slide_with_patch_preds = self._decorate_slide_with_patch_preds(patch_predictions=patch_preds,
+                                                                               slide=whole_slide,
+                                                                               class_colors=class_colors,
+                                                                               patch_size=self._patch_size)
+                imsave(output_path, slide_with_patch_preds)
             except FileNotFoundError:
                 logging.info(
                     "WARNING: One of the image directories is empty. Skipping this directory"
@@ -98,22 +98,22 @@ class Viewer:
         return colors[color]
 
     @staticmethod
-    def _decorate_wsi_with_patch_preds(
+    def _decorate_slide_with_patch_preds(
             patch_predictions: pd.DataFrame,
-            whole_slide: np.ndarray, class_colors: pd.Series,
+            slide: np.ndarray, class_colors: pd.Series,
             patch_size: int) -> np.ndarray:
         """
         Overlay the predicted dots (classes) on the WSI.
 
         Args:
-            whole_slide: WSI to add predicted dots to.
+            slide: WSI to add predicted dots to.
             class_colors: Dictionary mapping string color to NumPy ndarray color.
             patch_size: Size of the patches extracted from the WSI.
 
         Returns:
             The WSI with the predicted class dots overlaid.
         """
-        whole_slide = cv.UMat(whole_slide)
+        slide = cv.UMat(slide)
         for _, r in patch_predictions.iterrows():
             x = r['x']
             y = r['y']
@@ -123,8 +123,8 @@ class Viewer:
             half_patch_size = patch_size // 2
             radius = round(.06 * patch_size * confidence)
             center = (y + half_patch_size, x + half_patch_size)
-            whole_slide = cv.circle(whole_slide, center, radius, class_colors[prediction], cv.FILLED)
-        return whole_slide.get()
+            slide = cv.circle(slide, center, radius, class_colors[prediction], cv.FILLED)
+        return slide.get()
 
     def _load_class_colors(self) -> pd.Series():
         if self._colors_path is not None:

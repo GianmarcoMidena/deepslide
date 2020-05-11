@@ -49,7 +49,7 @@ class PatchTester:
             num_workers: Number of workers to use for IO.
         """
 
-    def predict(self, patches_metadata_paths: List[Path], wsi_metadata_paths: List[Path], class_idx_path: Path,
+    def predict(self, patches_metadata_paths: List[Path], slides_metadata_paths: List[Path], class_idx_path: Path,
                 partition_name: str, output_folder: Path) -> None:
         """
         Args:
@@ -70,8 +70,8 @@ class PatchTester:
         for p in patches_metadata_paths:
             patches_metadata = patches_metadata.append(pd.read_csv(p), ignore_index=True, sort=False)
 
-        slide_paths = [Path(wsi_path) for mp in wsi_metadata_paths
-                       for wsi_path in pd.read_csv(mp)['path']]
+        slide_paths = [Path(slide_path) for mp in slides_metadata_paths
+                       for slide_path in pd.read_csv(mp)['path']]
         mean, std = online_mean_and_std(image_paths=slide_paths)
 
         slide_ids = self._extract_slide_ids(patches_metadata)

@@ -57,22 +57,22 @@ class PatchExtractor(ABC):
 
         return total_patches_found
 
-    def extract_all_by_class(self, wsis_info: pd.DataFrame, partition_name: str, output_folder: Path,
+    def extract_all_by_class(self, slides_info: pd.DataFrame, partition_name: str, output_folder: Path,
                              step_size: int = None, step_size_finder: StepSizeFinder = None):
         """
         Args:
             output_folder: Folder to save the patches to.
         """
-        for class_name in self._extract_classes(wsis_info):
-            self._extract_all_from_class(class_name=class_name, wsis_info=wsis_info, partition_name=partition_name,
+        for class_name in self._extract_classes(slides_info):
+            self._extract_all_from_class(class_name=class_name, slides_info=slides_info, partition_name=partition_name,
                                          output_folder=output_folder,
                                          step_size=step_size, step_size_finder=step_size_finder)
 
-    def _extract_all_from_class(self, class_name: str, wsis_info: pd.DataFrame, partition_name: str,
+    def _extract_all_from_class(self, class_name: str, slides_info: pd.DataFrame, partition_name: str,
                                 output_folder: Path, step_size: int = None,
                                 step_size_finder: StepSizeFinder = None):
-        class_wsis_info = wsis_info.loc[wsis_info['label'] == class_name]
-        class_image_paths = self._search_image_paths(class_wsis_info)
+        class_slides_info = slides_info.loc[slides_info['label'] == class_name]
+        class_image_paths = self._search_image_paths(class_slides_info)
         if step_size is None:
             step_size = self._calc_class_step_size(image_paths=class_image_paths,
                                                    step_size_finder=step_size_finder)
@@ -185,12 +185,12 @@ class PatchExtractor(ABC):
         return ThreadPool(processes=num_workers)
 
     @staticmethod
-    def _extract_classes(wsis_info):
-        return wsis_info['label'].unique()
+    def _extract_classes(slides_info):
+        return slides_info['label'].unique()
 
     @staticmethod
-    def _search_image_paths(wsis_info: pd.DataFrame) -> List[Path]:
-        return wsis_info['path'].apply(Path).tolist()
+    def _search_image_paths(slides_info: pd.DataFrame) -> List[Path]:
+        return slides_info['path'].apply(Path).tolist()
 
     def set_logger_level(self, level):
         self._logger.setLevel(level)
