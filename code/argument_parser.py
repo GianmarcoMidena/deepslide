@@ -104,7 +104,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--slides_splits_dir",
             type=Path,
-            default=Path("slides"),
+            default=Path("slides/splits"),
             help="path to the wsi splits directory")
         return self
 
