@@ -4,7 +4,7 @@ from typing import List
 from shutil import copyfile
 import pandas as pd
 
-from code.utils import extract_subfolder_paths, search_folder_image_paths, search_all_image_paths
+from code.utils import extract_subfolder_paths, search_folder_file_paths, search_all_image_paths
 
 
 class PatchesBalancer:

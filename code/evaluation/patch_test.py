@@ -12,47 +12,49 @@ def patch_evaluate(args):
     slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
     patch_metadata_paths = sorted(list(args.eval_patches_root.glob("*part_*.csv")))
     tot_splits = len(slides_metadata_paths)
-    n_test_splits = 1
-    n_train_splits = tot_splits - n_test_splits
-    train_slides_metadata_paths = slides_metadata_paths[:-n_test_splits]
-    val_patch_metadata_paths = patch_metadata_paths[:-n_test_splits]
-    test_slides_metadata_paths = slides_metadata_paths[-n_test_splits:]
-    test_patch_metadata_paths = patch_metadata_paths[-n_test_splits:]
 
-    for i in range(n_train_splits):
-        part_id = i + 1
-        part_name = f'part_{part_id}'
+    outer_part_ids = list(range(tot_splits))
 
-        val_slides_metadata_paths_i = [train_slides_metadata_paths[i]]
-        val_patch_metadata_paths_i = [val_patch_metadata_paths[i]]
+    for i in outer_part_ids:
+        test_slides_metadata_paths = [slides_metadata_paths[i]]
+        test_patch_metadata_paths = [patch_metadata_paths[i]]
 
-        checkpoints_folder_i = args.checkpoints_root.joinpath(part_name)
-        checkpoint_path_i = checkpoints_folder_i.joinpath(args.checkpoint_file)
+        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i + 1:]
 
-        tester = PatchTester(auto_select=args.auto_select,
-                             batch_size=args.batch_size,
-                             checkpoints_folder=checkpoints_folder_i,
-                             classes=args.classes,
-                             device=args.device,
-                             eval_model=checkpoint_path_i,
-                             num_classes=args.num_classes,
-                             num_layers=args.num_layers,
-                             num_workers=args.num_workers,
-                             pretrain=args.pretrain)
+        for j in inner_part_ids:
+            part_id = f'{i+1}_{j+1}'
+            part_name = f'part_{part_id}'
 
-        # Apply the model to the validation patches.
-        tester.predict(patches_metadata_paths=val_patch_metadata_paths_i,
-                       slides_metadata_paths=val_slides_metadata_paths_i,
-                       partition_name=f'validation (part {part_id})',
-                       output_folder=args.preds_val.joinpath(part_name),
-                       class_idx_path=args.class_idx)
+            val_slides_metadata_paths = [slides_metadata_paths[j]]
+            val_patch_metadata_paths = [patch_metadata_paths[j]]
 
-        # Apply the model to the test patches.
-        tester.predict(patches_metadata_paths=test_patch_metadata_paths,
-                       slides_metadata_paths=test_slides_metadata_paths,
-                       partition_name='testing',
-                       output_folder=args.preds_test.joinpath(part_name),
-                       class_idx_path=args.class_idx)
+            checkpoints_folder = args.checkpoints_root.joinpath(part_name)
+            checkpoint_path = checkpoints_folder.joinpath(args.checkpoint_file)
+
+            tester = PatchTester(auto_select=args.auto_select,
+                                 batch_size=args.batch_size,
+                                 checkpoints_folder=checkpoints_folder,
+                                 classes=args.classes,
+                                 device=args.device,
+                                 eval_model=checkpoint_path,
+                                 num_classes=args.num_classes,
+                                 num_layers=args.num_layers,
+                                 num_workers=args.num_workers,
+                                 pretrain=args.pretrain)
+
+            # Apply the model to the validation patches.
+            tester.predict(patches_metadata_paths=val_patch_metadata_paths,
+                           slides_metadata_paths=val_slides_metadata_paths,
+                           partition_name=f'validation (part {j+1})',
+                           output_folder=args.preds_val.joinpath(part_name),
+                           class_idx_path=args.class_idx)
+
+            # Apply the model to the test patches.
+            tester.predict(patches_metadata_paths=test_patch_metadata_paths,
+                           slides_metadata_paths=test_slides_metadata_paths,
+                           partition_name=f'testing (part {i+1})',
+                           output_folder=args.preds_test.joinpath(part_name),
+                           class_idx_path=args.class_idx)
 
 
 def add_parser(subparsers):

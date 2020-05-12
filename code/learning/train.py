@@ -55,7 +55,6 @@ def train(args):
                     pretrain=args.pretrain,
                     resume_checkpoint=args.resume_checkpoint,
                     resume_checkpoint_path=resume_checkpoint_path_i,
-                    save_interval=args.save_interval,
                     num_epochs=args.num_epochs,
                     weight_decay=args.weight_decay,
                     early_stopping_patience=args.early_stopping,
@@ -81,7 +80,6 @@ def add_parser(subparsers):
               .with_num_workers() \
               .with_pretrain() \
               .with_resume_checkpoint() \
-              .with_save_interval() \
               .with_num_epochs() \
               .with_weight_decay() \
               .with_early_stopping() \

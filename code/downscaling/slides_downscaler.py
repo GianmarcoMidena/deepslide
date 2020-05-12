@@ -7,7 +7,7 @@ import PIL
 from PIL import Image
 from openslide import OpenSlide
 
-from code.utils import search_folder_image_paths, extract_subfolder_paths
+from code.utils import search_folder_file_paths, extract_subfolder_paths
 
 
 class SlidesDownscaler:
@@ -43,7 +43,7 @@ class SlidesDownscaler:
         class_paths = extract_subfolder_paths(self._original_slides_root)
         slide_paths = []
         for class_path in class_paths:
-            slide_paths += search_folder_image_paths(class_path)
+            slide_paths += search_folder_file_paths(class_path)
         return [p for p in slide_paths if not self._is_downscaled(p)]
 
     def _downscale_slide(self, slide_path: Path) -> bool:

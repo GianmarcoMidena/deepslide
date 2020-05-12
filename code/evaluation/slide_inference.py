@@ -15,51 +15,64 @@ def final_test(args):
 
     slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
     tot_splits = len(slides_metadata_paths)
-    n_test_splits = 1
-    n_train_splits = tot_splits - n_test_splits
-    train_slides_metadata_paths = slides_metadata_paths[:-n_test_splits]
-    test_slides_metadata_paths = slides_metadata_paths[-n_test_splits:]
 
     all_test_metrics = pd.DataFrame()
     all_conf_matrices = None
 
-    for i in range(n_train_splits):
-        part_id = i + 1
-        logging.info(f"fold {part_id}")
-        part_name = f'part_{part_id}'
+    outer_part_ids = list(range(tot_splits))
 
-        val_patches_pred_folder_i = args.preds_val.joinpath(part_name)
-        test_patches_pred_folder_i = args.preds_test.joinpath(part_name)
-        val_inference_fold_i = val_inference_root.joinpath(part_name)
-        test_inference_fold_i = test_inference_root.joinpath(part_name)
+    for i in outer_part_ids:
+        test_slides_metadata_paths = [slides_metadata_paths[i]]
+        test_inference_folder = test_inference_root.joinpath(f'part_{i+1}')
 
-        val_slides_metadata_paths_i = [train_slides_metadata_paths[i]]
+        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
 
-        validator = SlideInferencer(slides_metadata_paths=val_slides_metadata_paths_i,
-                                    patches_pred_folder=val_patches_pred_folder_i,
-                                    inference_folder=val_inference_fold_i,
-                                    classes=args.classes)
+        best_confidence_th = None
+        best_score = 0
+        best_part_id = None
+
+        for j in inner_part_ids:
+            part_id = f"{i+1}_{j+1}"
+            logging.info(f"fold {part_id}")
+            part_name = f'part_{part_id}'
+
+            val_patches_pred_folder = args.preds_val.joinpath(part_name)
+            val_inference_folder = val_inference_root.joinpath(part_name)
+
+            val_slides_metadata_paths = [slides_metadata_paths[j]]
+
+            validator = SlideInferencer(slides_metadata_paths=val_slides_metadata_paths,
+                                        patches_pred_folder=val_patches_pred_folder,
+                                        inference_folder=val_inference_folder,
+                                        classes=args.classes)
+
+            # Searching over thresholds for filtering noise.
+            validator.search_confidence_thesholds()
+
+            # Running the code on the evaluation set.
+            new_confidence_th, new_score = validator.find_best_confidence_threshold()
+
+            if new_score > best_score:
+                best_score = new_score
+                best_confidence_th = new_confidence_th
+                best_part_id = part_id
+
+        test_patches_pred_folder = args.preds_test.joinpath(f'part_{best_part_id}')
 
         tester = SlideInferencer(slides_metadata_paths=test_slides_metadata_paths,
-                                 patches_pred_folder=test_patches_pred_folder_i,
-                                 inference_folder=test_inference_fold_i,
+                                 patches_pred_folder=test_patches_pred_folder,
+                                 inference_folder=test_inference_folder,
                                  classes=args.classes)
-
-        # Searching over thresholds for filtering noise.
-        validator.search_confidence_thesholds()
-
-        # Running the code on the evaluation set.
-        best_confidence_th = validator.find_best_confidence_threshold()
 
         tester.report_predictions(confidence_th=best_confidence_th)
 
-        metrics_i, conf_matrix_i = tester.final_test_results()
+        metrics, conf_matrix = tester.final_test_results()
 
-        all_test_metrics = all_test_metrics.append(metrics_i, ignore_index=True, sort=False)
+        all_test_metrics = all_test_metrics.append(metrics, ignore_index=True, sort=False)
         if all_conf_matrices is None:
-            all_conf_matrices = conf_matrix_i
+            all_conf_matrices = conf_matrix
         else:
-            all_conf_matrices += conf_matrix_i
+            all_conf_matrices += conf_matrix
 
     logging.info("Overall final test metrics"
                  f"\n{all_test_metrics.mean(axis=0)} "

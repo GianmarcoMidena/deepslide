@@ -1,7 +1,7 @@
 import logging
 from glob import glob
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (confusion_matrix, f1_score, precision_score, recall_score, accuracy_score,
@@ -37,7 +37,7 @@ class SlideInferencer:
         for confidence_th in self._CONFIDENCE_THRESHOLDS:
             self.report_predictions(confidence_th=confidence_th)
 
-    def find_best_confidence_threshold(self) -> float:
+    def find_best_confidence_threshold(self) -> Tuple[float, float]:
         """
         Find the best accuracy and threshold for the given images.
 
@@ -55,12 +55,12 @@ class SlideInferencer:
             logging.info(f"predictions with confidence > {confidence_th_i}, "
                          f"\n{metrics_i} "
                          f"\n{conf_matrix_i}")
-            f_score = metrics_i['f_score']
-            if f_score > best_score or best_confidence_th is None:
-                best_score = f_score
+            acc_score = metrics_i['accuracy']
+            if acc_score > best_score or best_confidence_th is None:
+                best_score = acc_score
                 best_confidence_th = confidence_th_i
         logging.info(f"best confidence threshold: {best_confidence_th}")
-        return best_confidence_th
+        return best_confidence_th, best_score
 
     def final_test_results(self):
         """

@@ -9,7 +9,7 @@ from torch import nn
 from torchvision import transforms
 from ..compute_stats import online_mean_and_std
 
-from code.utils import search_folder_image_paths
+from code.utils import search_folder_file_paths
 from code.models import resnet
 from ..dataset import Dataset
 
@@ -127,8 +127,10 @@ class PatchTester:
         return pred_labels, pred_confidences
 
     def _load_model(self):
-        model_path = self._get_best_model(
-            checkpoints_folder=self._checkpoints_folder) if self._auto_select else self._eval_model
+        if self._auto_select:
+            model_path = self._get_best_model(checkpoints_folder=self._checkpoints_folder)
+        else:
+            model_path = self._eval_model
         model = resnet(num_classes=self._num_classes,
                        num_layers=self._num_layers,
                        pretrain=self._pretrain)
@@ -139,7 +141,7 @@ class PatchTester:
         logging.info(f"model loaded from {model_path}")
         self._model = model
 
-    def _get_best_model(self, checkpoints_folder: Path) -> str:
+    def _get_best_model(self, checkpoints_folder: Path) -> Path:
         """
         Finds the model with the best validation accuracy.
 
@@ -151,7 +153,7 @@ class PatchTester:
         """
         return max({
                        model: self._parse_val_acc(model_path=model)
-                       for model in search_folder_image_paths(folder=checkpoints_folder)
+                       for model in search_folder_file_paths(folder=checkpoints_folder)
                    }.items(),
                    key=operator.itemgetter(1))[0]
 

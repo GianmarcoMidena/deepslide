@@ -318,13 +318,6 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Resume model from checkpoint file")
         return self
 
-    def with_save_interval(self):
-        self.add_argument("--save_interval",
-                          type=int,
-                          default=1,
-                          help="Number of epochs between saving checkpoints")
-        return self
-
     def with_checkpoints_root(self):
         # Where models are saved.
         self.add_argument("--checkpoints_root",

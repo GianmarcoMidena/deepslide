@@ -43,15 +43,15 @@ def get_log_csv_name(log_folder: Path) -> Path:
                                f"_{now.hour}{now.minute}{now.second}.csv")
 
 
-def search_folder_image_paths(folder: Path) -> List[Path]:
+def search_folder_file_paths(folder: Path) -> List[Path]:
     """
-    Find the full paths of the images in a folder.
+    Find the full paths of the files in a folder.
 
     Args:
-        folder: Folder containing images (assume folder only contains images).
+        folder: Folder containing files.
 
     Returns:
-        A list of the full paths to the images in the folder.
+        A list of the full paths to the files in the folder.
     """
     return sorted([
         folder.joinpath(f.name) for f in folder.iterdir() if ((
@@ -90,7 +90,7 @@ def search_all_image_paths(master_folder: Path) -> List[Path]:
     subfolders = extract_subfolder_paths(folder=master_folder)
     if len(subfolders) > 1:
         for subfolder in subfolders:
-            all_paths += search_folder_image_paths(folder=subfolder)
+            all_paths += search_folder_file_paths(folder=subfolder)
     else:
-        all_paths = search_folder_image_paths(folder=master_folder)
+        all_paths = search_folder_file_paths(folder=master_folder)
     return all_paths

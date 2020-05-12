@@ -26,7 +26,7 @@ class Learner:
                  color_jitter_brightness: float, color_jitter_contrast: float,
                  color_jitter_hue: float, color_jitter_saturation: float, num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
-                 num_epochs: int, save_interval: int, early_stopping_patience: int,
+                 num_epochs: int, early_stopping_patience: int,
                  train_slides_metadata_paths: List[Path], val_slides_metadata_paths: List[Path],
                  train_patch_metadata_paths: List[Path], val_patch_metadata_paths: List[Path],
                  class_idx_path: Path):
@@ -51,7 +51,6 @@ class Learner:
             pretrain: Use pretrained ResNet weights.
             checkpoints_folder: Directory to save model checkpoints to.
             num_epochs: Number of epochs for learning.
-            save_interval: Number of epochs between saving checkpoints.
         """
         self._batch_size = batch_size
         self._num_workers = num_workers
@@ -72,7 +71,6 @@ class Learner:
         self._pretrain = pretrain
         self._checkpoints_folder = checkpoints_folder
         self._num_epochs = num_epochs
-        self._save_interval = save_interval
         self._early_stopping_patience = early_stopping_patience
         self._train_slides_metadata_paths = train_slides_metadata_paths
         self._val_slides_metadata_paths = val_slides_metadata_paths
@@ -228,7 +226,6 @@ class Learner:
                      f"resume_checkpoint: {self._resume_checkpoint}\n"
                      f"resume_checkpoint_path (only if resume_checkpoint is true): "
                      f"{self._resume_checkpoint_path}\n"
-                     f"save_interval: {self._save_interval}\n"
                      f"output in checkpoints_folder: {self._checkpoints_folder}\n"
                      f"pretrain: {self._pretrain}\n"
                      f"log_csv: {self._log_csv}\n\n")
@@ -266,6 +263,8 @@ class Learner:
         val_all_predicts = torch.empty(size=(dataset_sizes["val"],),
                                        dtype=torch.long).cpu()
         early_stopper = EarlyStopper(patience=self._early_stopping_patience)
+
+        best_val_acc = 0.
 
         # Train for specified number of epochs.
         for epoch in range(start_epoch, self._num_epochs):
@@ -362,12 +361,13 @@ class Learner:
                 current_lr = group["lr"]
 
             # Remaining things related to learning.
-            if epoch % self._save_interval == 0:
-                epoch_output_path = self._checkpoints_folder.joinpath(
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                best_model_ckpt_path = self._checkpoints_folder.joinpath(
                     f"resnet{self._num_layers}_e{epoch}_va{val_acc:.5f}.pt")
 
                 # Confirm the output directory exists.
-                epoch_output_path.parent.mkdir(parents=True, exist_ok=True)
+                best_model_ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Save the model as a state dictionary.
                 torch.save(obj={
@@ -376,7 +376,9 @@ class Learner:
                     "scheduler_state_dict": scheduler.state_dict(),
                     "epoch": epoch + 1
                 },
-                    f=str(epoch_output_path))
+                    f=str(best_model_ckpt_path))
+
+                self._clean_ckpt_folder(best_model_ckpt_path)
 
             writer.write(f"{epoch},{train_loss:.4f},"
                          f"{train_acc:.4f},{val_loss:.4f},{val_acc:.4f}\n")
@@ -425,3 +427,9 @@ class Learner:
         probs = nn.Sigmoid()(logits)
         target = target.float()
         return nn.BCELoss()(input=probs, target=target)
+
+    def _clean_ckpt_folder(self, best_model_ckpt_path):
+        all_ckpt_paths = best_model_ckpt_path.parent.glob(f"resnet{self._num_layers}_e*_va*.pt")
+        for ckpt_path in all_ckpt_paths:
+            if ckpt_path.name != best_model_ckpt_path.name:
+                ckpt_path.unlink()
