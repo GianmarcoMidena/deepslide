@@ -262,7 +262,7 @@ class Learner:
                                      dtype=torch.long).cpu()
         val_all_predicts = torch.empty(size=(dataset_sizes["val"],),
                                        dtype=torch.long).cpu()
-        early_stopper = EarlyStopper(patience=self._early_stopping_patience)
+        early_stopper = EarlyStopper(patience=self._early_stopping_patience, mode=EarlyStopper.Mode.MAX)
 
         best_val_acc = 0.
 
@@ -392,7 +392,7 @@ class Learner:
                          f"v_loss: {val_loss:.4f} "
                          f"v_acc: {val_acc:.4f}\n")
 
-            early_stopper.update(val_loss)
+            early_stopper.update(val_acc)
             if early_stopper.is_stopping():
                 logging.info("Early stopping")
                 break
