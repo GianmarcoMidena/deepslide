@@ -16,11 +16,12 @@ def train(args):
     outer_part_ids = list(range(tot_splits))
 
     fixed_folds = args.fixed_folds
-    if fixed_folds:
-        outer_part_ids = [part_id for part_id in outer_part_ids if part_id+1 in fixed_folds]
 
     for i in outer_part_ids:
         inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
+
+        if fixed_folds:
+            inner_part_ids = [j for j in inner_part_ids if (f"{i+1}" in fixed_folds) or (f"{i+1}_{j+1}" in fixed_folds)]
 
         for j in inner_part_ids:
             part_name = f'part_{i+1}_{j+1}'

@@ -95,7 +95,7 @@ class ArgumentParser(argparse.ArgumentParser):
     def with_fixed_folds(self):
         self.add_argument(
             "--fixed_folds",
-            type=int,
+            type=str,
             nargs='*',
             required=False)
         return self
@@ -104,7 +104,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--slides_splits_dir",
             type=Path,
-            default=Path("slides/splits"),
+            default=Path("slides"),
             help="path to the wsi splits directory")
         return self
 
