@@ -11,8 +11,8 @@ class SlidesSplitter:
     Splits the data into learning, validation, and evaluation sets.
     """
 
-    def __init__(self, slides_root: Path, group: str, slides_metadata: Path, n_splits: int, output_dir: Path,
-                 path_column: str, seed: int = None):
+    def __init__(self, group: str, n_splits: int, output_dir: Path, path_column: str,
+                 slides_root: Path = None, slides_metadata: Path = None, seed: int = None):
         """
         Args:
             slides_root: Location of the WSIs organized in subfolders by class.
