@@ -92,6 +92,13 @@ class ArgumentParser(argparse.ArgumentParser):
         )
         return self
 
+    def with_spatial_sensitivity(self):
+        self.add_argument(
+            "--spatial_sensitive",
+            action="store_true"
+        )
+        return self
+
     def with_path_column(self):
         self.add_argument(
             "--path_column",

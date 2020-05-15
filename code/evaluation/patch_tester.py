@@ -10,8 +10,8 @@ from torchvision import transforms
 from ..compute_stats import online_mean_and_std
 
 from code.utils import search_folder_file_paths
-from code.models import resnet
 from ..dataset import Dataset
+from ..model import Model
 
 
 class PatchTester:
@@ -19,7 +19,8 @@ class PatchTester:
                  eval_model: Path, device: torch.device,
                  classes: List[str], num_classes: int,
                  num_layers: int, pretrain: bool,
-                 batch_size: int, num_workers: int):
+                 batch_size: int, num_workers: int, patch_size: int,
+                 spatial_sensitive: bool):
         self._auto_select = auto_select
         self._batch_size = batch_size
         self._checkpoints_folder = checkpoints_folder
@@ -30,6 +31,8 @@ class PatchTester:
         self._num_layers = num_layers
         self._num_workers = num_workers
         self._pretrain = pretrain
+        self._patch_size = patch_size
+        self._spatial_sensitive = spatial_sensitive
         self._model = None
         """
         Args:
@@ -95,18 +98,18 @@ class PatchTester:
 
         patch_names = patches_metadata['path'].str.rsplit("/", n=1, expand=True)[1] \
                                               .str.rsplit(".", n=1, expand=True)[0]
-        for batch_index, (eval_patches, _) in enumerate(eval_data):
-            report = self._predict_for_batch_of_patches(batch_index, eval_patches, patch_names, report)
+        for batch_index, (eval_inputs, _) in enumerate(eval_data):
+            report = self._predict_for_batch_of_patches(batch_index, eval_inputs, patch_names, report)
 
         report.to_csv(output_folder.joinpath(f"{slide_id}.csv"), index=False, float_format='%.5f')
 
-    def _predict_for_batch_of_patches(self, batch_index: int, test_inputs, patch_names: pd.Series,
+    def _predict_for_batch_of_patches(self, batch_index: int, eval_inputs, patch_names: pd.Series,
                                       report: pd.DataFrame):
         batch_window_names = patch_names.iloc[batch_index * self._batch_size:
                                               batch_index * self._batch_size + self._batch_size]
         x, y = batch_window_names.str.split("_", expand=True).iloc[:, -2:].values.T.tolist()
 
-        test_preds, confidences = self._extract_pred_labels_and_confidences(test_inputs)
+        test_preds, confidences = self._extract_pred_labels_and_confidences(eval_inputs)
 
         batch_report = pd.DataFrame({"x": x, "y": y,
                                      "prediction": self._to_class_name(id=test_preds.tolist()),
@@ -116,7 +119,10 @@ class PatchTester:
                              sort=False, ignore_index=True)
 
     def _extract_pred_labels_and_confidences(self, inputs):
-        logits = self._model(inputs.to(device=self._device)).squeeze(dim=1)
+        patches = inputs["patch"].to(device=self._device)
+        x_coord = inputs["x_coord"].to(device=self._device)
+        y_coord = inputs["y_coord"].to(device=self._device)
+        logits = self._model(patches, x_coord, y_coord).squeeze(dim=1)
         if self._num_classes > 2:
             probs = nn.Softmax(dim=1)(logits)
         else:
@@ -131,9 +137,9 @@ class PatchTester:
             model_path = self._get_best_model(checkpoints_folder=self._checkpoints_folder)
         else:
             model_path = self._eval_model
-        model = resnet(num_classes=self._num_classes,
-                       num_layers=self._num_layers,
-                       pretrain=self._pretrain)
+        model = Model(num_classes=self._num_classes,
+                      num_layers=self._num_layers,
+                      pretrain=self._pretrain, spatial_sensitive=self._spatial_sensitive)
         ckpt = torch.load(f=model_path)
         model.load_state_dict(state_dict=ckpt["model_state_dict"])
         model = model.to(device=self._device)
@@ -170,7 +176,7 @@ class PatchTester:
                 transform=transforms.Compose(transforms=[
                     transforms.ToTensor(),
                     transforms.Normalize(mean=mean, std=std)
-                ]))
+                ]), patch_size=self._patch_size)
             dataloader = torch.utils.data.DataLoader(
                 dataset=dataset,
                 batch_size=self._batch_size,

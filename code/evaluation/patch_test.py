@@ -12,9 +12,9 @@ def patch_evaluate(args):
     slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
 
     if args.test_slides_metadata:
-        nested_cross_validation = True
-    else:
         nested_cross_validation = False
+    else:
+        nested_cross_validation = True
 
     patch_metadata_paths = sorted(list(args.eval_patches_root.rglob("*part_*.csv")))
 
@@ -56,7 +56,9 @@ def patch_evaluate(args):
                                  num_classes=args.num_classes,
                                  num_layers=args.num_layers,
                                  num_workers=args.num_workers,
-                                 pretrain=args.pretrain)
+                                 pretrain=args.pretrain,
+                                 patch_size=args.patch_size,
+                                 spatial_sensitive=args.spatial_sensitive)
 
             # Apply the model to the validation patches.
             tester.predict(patches_metadata_paths=val_patch_metadata_paths,
@@ -92,4 +94,6 @@ def add_parser(subparsers):
         .with_checkpoint_file() \
         .with_class_idx() \
         .with_test_slides_metadata() \
+        .with_patch_size() \
+        .with_spatial_sensitivity() \
         .set_defaults(func=patch_evaluate)

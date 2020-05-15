@@ -22,9 +22,9 @@ def final_test(args):
     outer_part_ids = list(range(tot_splits))
 
     if args.test_slides_metadata:
-        nested_cross_validation = True
-    else:
         nested_cross_validation = False
+    else:
+        nested_cross_validation = True
 
     for i in outer_part_ids:
         if nested_cross_validation:
@@ -97,7 +97,7 @@ def final_test(args):
                      f"\n{all_conf_matrices/all_conf_matrices.sum().sum()}")
     else:
         logging.info("Test metrics"
-                     f"\n{all_test_metrics} "
+                     f"\n{all_test_metrics.squeeze()} "
                      f"\n{all_conf_matrices / all_conf_matrices.sum().sum()}")
 
 

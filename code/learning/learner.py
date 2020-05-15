@@ -15,8 +15,7 @@ from code.compute_stats import online_mean_and_std
 from code.dataset import Dataset
 from code.learning.early_stopper import EarlyStopper
 from code.learning.random90rotation import Random90Rotation
-from code.models import resnet
-
+from code.model import Model
 
 class Learner:
     def __init__(self, batch_size: int, num_workers: int,
@@ -29,7 +28,7 @@ class Learner:
                  num_epochs: int, early_stopping_patience: int,
                  train_slides_metadata_paths: List[Path], val_slides_metadata_paths: List[Path],
                  train_patch_metadata_paths: List[Path], val_patch_metadata_paths: List[Path],
-                 class_idx_path: Path):
+                 class_idx_path: Path, spatial_sensitive: bool, patch_size: int):
         """
         Args:
             batch_size: Mini-batch size to use for learning.
@@ -77,6 +76,8 @@ class Learner:
         self._train_patch_metadata_paths = train_patch_metadata_paths
         self._val_patch_metadata_paths = val_patch_metadata_paths
         self._class_idx_path = class_idx_path
+        self._spatial_sensitive = spatial_sensitive
+        self._patch_size = patch_size
 
     def train(self) -> None:
         # Loading in the data.
@@ -84,9 +85,9 @@ class Learner:
 
         image_datasets = {
             'train': Dataset(metadata_paths=self._train_patch_metadata_paths, transform=data_transforms['train'],
-                             class_idx_path=self._class_idx_path),
+                             class_idx_path=self._class_idx_path, patch_size=self._patch_size),
             'val': Dataset(metadata_paths=self._val_patch_metadata_paths, transform=data_transforms['val'],
-                           class_idx_path=self._class_idx_path)
+                           class_idx_path=self._class_idx_path, patch_size=self._patch_size)
         }
 
         dataloaders = {
@@ -103,9 +104,11 @@ class Learner:
                      f"num val images {len(dataloaders['val']) * self._batch_size}\n"
                      f"CUDA is_available: {torch.cuda.is_available()}")
 
-        model = resnet(num_classes=self._num_classes,
-                       num_layers=self._num_layers,
-                       pretrain=self._pretrain)
+        model = Model(num_classes=self._num_classes,
+                      num_layers=self._num_layers,
+                      pretrain=self._pretrain,
+                      spatial_sensitive=self._spatial_sensitive)
+
         model = model.to(device=self._device)
         optimizer = optim.Adam(params=model.parameters(),
                                lr=self._learning_rate,
@@ -278,20 +281,22 @@ class Learner:
 
             # Train over all learning data.
             for idx, (train_inputs, true_labels) in enumerate(dataloaders["train"]):
-                train_inputs = train_inputs.to(device=self._device)
+                train_patches = train_inputs["patch"].to(device=self._device)
+                train_x_coord = train_inputs["x_coord"].to(device=self._device)
+                train_y_coord = train_inputs["y_coord"].to(device=self._device)
                 true_labels = true_labels.to(device=self._device)
                 optimizer.zero_grad()
 
                 # Forward and backpropagation.
                 with torch.set_grad_enabled(mode=True):
-                    train_logits = model(train_inputs).squeeze(dim=1)
+                    train_logits = model(train_patches, train_x_coord, train_y_coord).squeeze(dim=1)
                     train_loss = loss_fn(logits=train_logits,
                                          target=true_labels)
                     train_loss.backward()
                     optimizer.step()
 
                 # Update learning diagnostics.
-                train_running_loss += train_loss.item() * train_inputs.size(0)
+                train_running_loss += train_loss.item() * train_patches.size(0)
                 pred_labels = self._extract_pred_labels(train_logits)
                 train_running_corrects += torch.sum(
                     pred_labels == true_labels.data, dtype=torch.double)
@@ -322,16 +327,18 @@ class Learner:
 
             # Feed forward over all the validation data.
             for idx, (val_inputs, val_labels) in enumerate(dataloaders["val"]):
-                val_inputs = val_inputs.to(device=self._device)
+                val_patches = val_inputs["patch"].to(device=self._device)
+                val_x_coord = val_inputs["x_coord"].to(device=self._device)
+                val_y_coord = val_inputs["y_coord"].to(device=self._device)
                 val_labels = val_labels.to(device=self._device)
 
                 # Feed forward.
                 with torch.set_grad_enabled(mode=False):
-                    val_logits = model(val_inputs).squeeze(dim=1)
+                    val_logits = model(val_patches, val_x_coord, val_y_coord).squeeze(dim=1)
                     val_loss = loss_fn(logits=val_logits, target=val_labels)
 
                 # Update validation diagnostics.
-                val_running_loss += val_loss.item() * val_inputs.size(0)
+                val_running_loss += val_loss.item() * val_patches.size(0)
                 pred_labels = self._extract_pred_labels(val_logits)
                 val_running_corrects += torch.sum(pred_labels == val_labels.data,
                                                   dtype=torch.double)

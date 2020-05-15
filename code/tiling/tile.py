@@ -41,18 +41,18 @@ def tile(args):
     slides_metadata = slides_metadata.set_index('id', drop=True)
 
     if args.test_slides_metadata:
-        test_metadata = pd.read_csv(args.test_slides_metadata)
+        test_metadata = pd.read_csv(args.test_slides_metadata).set_index('id', drop=True)
         test_eval_dir = args.eval_patches_root.joinpath('test')
 
         patch_extractor.extract_all(image_paths=_extract_image_paths(test_metadata), step_size=eval_step_size,
                                     partition_name='testing', output_folder=test_eval_dir, by_wsi=True)
 
-        report_test_eval_part_i = pd.DataFrame([str(x) for c in test_eval_dir.iterdir()
-                                                       for x in c.iterdir()], columns=['path'])
-        report_test_eval_part_i['id'] = report_test_eval_part_i['path'].str.rsplit('/', n=1, expand=True)[1] \
-                                                                       .str.rsplit('_', n=2, expand=True)[0]
-        report_test_eval_part_i = report_test_eval_part_i.set_index('id', drop=True)
-        report_test_eval_part_i = report_test_eval_part_i.join(test_metadata['label'], how='inner', sort=False)
+        report_test_eval = pd.DataFrame([str(x) for c in test_eval_dir.iterdir()
+                                                for x in c.iterdir()], columns=['path'])
+        report_test_eval['id'] = report_test_eval['path'].str.rsplit('/', n=1, expand=True)[1] \
+                                                         .str.rsplit('_', n=2, expand=True)[0]
+        report_test_eval = report_test_eval.set_index('id', drop=True)
+        report_test_eval_part_i = report_test_eval.join(test_metadata['label'], how='inner', sort=False)
         report_test_eval_part_i.to_csv(test_eval_dir.joinpath(f"test_eval_patches.csv"), index=False)
 
     for metadata_path_i in splits_metadata_paths:

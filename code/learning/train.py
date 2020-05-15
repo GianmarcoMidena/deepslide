@@ -74,7 +74,9 @@ def train(args):
                     val_slides_metadata_paths=val_slides_metadata_paths,
                     train_patch_metadata_paths=train_patch_metadata_paths,
                     val_patch_metadata_paths=val_patch_metadata_paths,
-                    class_idx_path=args.class_idx).train()
+                    class_idx_path=args.class_idx,
+                    spatial_sensitive=args.spatial_sensitive,
+                    patch_size=args.patch_size).train()
 
         if not args.nested_cross_validation:
             break
@@ -104,4 +106,6 @@ def add_parser(subparsers):
               .with_class_idx() \
               .with_fixed_folds() \
               .with_nested_cross_validation() \
+              .with_spatial_sensitivity() \
+              .with_patch_size() \
               .set_defaults(func=train)
