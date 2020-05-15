@@ -62,8 +62,33 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--slides_metadata",
             type=Path,
-            default=Path("slides/metadata.csv"),
+            required=False,
             help="Location of a CSV file containing the wsi metadata"
+        )
+        return self
+
+    def with_train_slides_metadata(self):
+        self.add_argument(
+            "--train_slides_metadata",
+            type=Path,
+            required=False,
+            help="Location of a CSV file containing the train slide metadata"
+        )
+        return self
+
+    def with_test_slides_metadata(self):
+        self.add_argument(
+            "--test_slides_metadata",
+            type=Path,
+            required=False,
+            help="Location of a CSV file containing the train slide metadata"
+        )
+        return self
+
+    def with_nested_cross_validation(self):
+        self.add_argument(
+            "--nested_cross_validation",
+            action="store_true"
         )
         return self
 

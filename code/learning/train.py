@@ -18,29 +18,40 @@ def train(args):
     fixed_folds = args.fixed_folds
 
     for i in outer_part_ids:
-        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
+
+        if args.nested_cross_validation:
+            inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
+        else:
+            inner_part_ids = outer_part_ids
 
         if fixed_folds:
-            inner_part_ids = [j for j in inner_part_ids if (f"{i+1}" in fixed_folds) or (f"{i+1}_{j+1}" in fixed_folds)]
+            if args.nested_cross_validation:
+                inner_part_ids = [j for j in inner_part_ids
+                                  if (f"{i+1}" in fixed_folds) or (f"{i+1}_{j+1}" in fixed_folds)]
+            else:
+                inner_part_ids = [j for j in inner_part_ids if f"{j + 1}" in fixed_folds]
 
         for j in inner_part_ids:
-            part_name = f'part_{i+1}_{j+1}'
+            if args.nested_cross_validation:
+                part_name = f'part_{i+1}_{j+1}'
+            else:
+                part_name = f'part_{j + 1}'
 
             val_slides_metadata_paths = [slides_metadata_paths[j]]
             val_patch_metadata_paths = [patch_metadata_paths[j]]
             train_slides_metadata_paths = slides_metadata_paths[:j] + slides_metadata_paths[j+1:]
             train_patch_metadata_paths = patch_metadata_paths[:j] + patch_metadata_paths[j+1:]
 
-            checkpoints_folder_i = args.checkpoints_root.joinpath(part_name)
+            checkpoints_folder = args.checkpoints_root.joinpath(part_name)
             # Only used is resume_checkpoint is True.
-            resume_checkpoint_path_i = checkpoints_folder_i.joinpath(args.checkpoint_file)
+            resume_checkpoint_path = checkpoints_folder.joinpath(args.checkpoint_file)
 
             # Named with date and time.
-            log_csv_i = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
+            log_csv = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
 
             # Training the ResNet.
             Learner(batch_size=args.batch_size,
-                    checkpoints_folder=checkpoints_folder_i,
+                    checkpoints_folder=checkpoints_folder,
                     classes=args.classes,
                     color_jitter_brightness=args.color_jitter_brightness,
                     color_jitter_contrast=args.color_jitter_contrast,
@@ -49,13 +60,13 @@ def train(args):
                     device=args.device,
                     learning_rate=args.learning_rate,
                     learning_rate_decay=args.learning_rate_decay,
-                    log_csv=log_csv_i,
+                    log_csv=log_csv,
                     num_classes=args.num_classes,
                     num_layers=args.num_layers,
                     num_workers=args.num_workers,
                     pretrain=args.pretrain,
                     resume_checkpoint=args.resume_checkpoint,
-                    resume_checkpoint_path=resume_checkpoint_path_i,
+                    resume_checkpoint_path=resume_checkpoint_path,
                     num_epochs=args.num_epochs,
                     weight_decay=args.weight_decay,
                     early_stopping_patience=args.early_stopping,
@@ -65,6 +76,8 @@ def train(args):
                     val_patch_metadata_paths=val_patch_metadata_paths,
                     class_idx_path=args.class_idx).train()
 
+        if not args.nested_cross_validation:
+            break
 
 def add_parser(subparsers):
     subparsers.add_parser("train") \
@@ -90,4 +103,5 @@ def add_parser(subparsers):
               .with_log_root() \
               .with_class_idx() \
               .with_fixed_folds() \
+              .with_nested_cross_validation() \
               .set_defaults(func=train)

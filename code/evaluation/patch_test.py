@@ -10,19 +10,35 @@ def patch_evaluate(args):
         .build()
 
     slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
-    patch_metadata_paths = sorted(list(args.eval_patches_root.glob("*part_*.csv")))
+
+    if args.test_slides_metadata:
+        nested_cross_validation = True
+    else:
+        nested_cross_validation = False
+
+    patch_metadata_paths = sorted(list(args.eval_patches_root.rglob("*part_*.csv")))
+
     tot_splits = len(slides_metadata_paths)
 
     outer_part_ids = list(range(tot_splits))
 
     for i in outer_part_ids:
-        test_slides_metadata_paths = [slides_metadata_paths[i]]
-        test_patch_metadata_paths = [patch_metadata_paths[i]]
-
-        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i + 1:]
+        if nested_cross_validation:
+            test_slides_metadata_paths = [slides_metadata_paths[i]]
+            test_patch_metadata_paths = [patch_metadata_paths[i]]
+            inner_part_ids = outer_part_ids[:i] + outer_part_ids[i + 1:]
+            testing_partition_name = f'testing (part {i+1})'
+        else:
+            test_slides_metadata_paths = [args.test_slides_metadata]
+            test_patch_metadata_paths = [args.eval_patches_root.joinpath('test').joinpath("test_eval_patches.csv")]
+            inner_part_ids = outer_part_ids
+            testing_partition_name = f'testing'
 
         for j in inner_part_ids:
-            part_id = f'{i+1}_{j+1}'
+            if nested_cross_validation:
+                part_id = f'{i+1}_{j+1}'
+            else:
+                part_id = f'{j + 1}'
             part_name = f'part_{part_id}'
 
             val_slides_metadata_paths = [slides_metadata_paths[j]]
@@ -52,9 +68,12 @@ def patch_evaluate(args):
             # Apply the model to the test patches.
             tester.predict(patches_metadata_paths=test_patch_metadata_paths,
                            slides_metadata_paths=test_slides_metadata_paths,
-                           partition_name=f'testing (part {i+1})',
+                           partition_name=testing_partition_name,
                            output_folder=args.preds_test.joinpath(part_name),
                            class_idx_path=args.class_idx)
+
+        if not nested_cross_validation:
+            break
 
 
 def add_parser(subparsers):
@@ -72,4 +91,5 @@ def add_parser(subparsers):
         .with_checkpoints_root() \
         .with_checkpoint_file() \
         .with_class_idx() \
+        .with_test_slides_metadata() \
         .set_defaults(func=patch_evaluate)

@@ -21,18 +21,31 @@ def final_test(args):
 
     outer_part_ids = list(range(tot_splits))
 
-    for i in outer_part_ids:
-        test_slides_metadata_paths = [slides_metadata_paths[i]]
-        test_inference_folder = test_inference_root.joinpath(f'part_{i+1}')
+    if args.test_slides_metadata:
+        nested_cross_validation = True
+    else:
+        nested_cross_validation = False
 
-        inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
+    for i in outer_part_ids:
+        if nested_cross_validation:
+            test_slides_metadata_paths = [slides_metadata_paths[i]]
+            test_inference_folder = test_inference_root.joinpath(f'part_{i+1}')
+            inner_part_ids = outer_part_ids[:i] + outer_part_ids[i+1:]
+        else:
+            test_slides_metadata_paths = [args.test_slides_metadata]
+            test_inference_folder = test_inference_root
+            inner_part_ids = outer_part_ids
 
         best_confidence_th = None
         best_score = 0
         best_part_id = None
 
         for j in inner_part_ids:
-            part_id = f"{i+1}_{j+1}"
+            if nested_cross_validation:
+                part_id = f"{i+1}_{j+1}"
+            else:
+                part_id = f"{j + 1}"
+
             logging.info(f"fold {part_id}")
             part_name = f'part_{part_id}'
 
@@ -75,9 +88,17 @@ def final_test(args):
         else:
             all_conf_matrices += conf_matrix
 
-    logging.info("Overall final test metrics"
-                 f"\n{all_test_metrics.mean(axis=0)} "
-                 f"\n{all_conf_matrices/all_conf_matrices.sum().sum()}")
+        if not nested_cross_validation:
+            break
+
+    if nested_cross_validation:
+        logging.info("Overall final test metrics"
+                     f"\n{all_test_metrics.mean(axis=0)} "
+                     f"\n{all_conf_matrices/all_conf_matrices.sum().sum()}")
+    else:
+        logging.info("Test metrics"
+                     f"\n{all_test_metrics} "
+                     f"\n{all_conf_matrices / all_conf_matrices.sum().sum()}")
 
 
 def add_parser(subparsers):
@@ -89,4 +110,5 @@ def add_parser(subparsers):
         .with_preds_test() \
         .with_positive_class() \
         .with_negative_class() \
+        .with_test_slides_metadata() \
         .set_defaults(func=final_test)
