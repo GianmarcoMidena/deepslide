@@ -59,7 +59,7 @@ class SlideInferencer:
             if acc_score > best_score or best_confidence_th is None:
                 best_score = acc_score
                 best_confidence_th = confidence_th_i
-        logging.info(f"best confidence threshold: {best_confidence_th}")
+        logging.info(f"best confidence threshold: {best_confidence_th}, best_acc: {best_score}")
         return best_confidence_th, best_score
 
     def final_test_results(self):

@@ -57,6 +57,7 @@ def final_test(args):
                 best_confidence_th = new_confidence_th
                 best_part_id = part_id
 
+        logging.info(f"best acc: {best_score}, best confidence th: {best_confidence_th}, best part: {best_part_id}")
         test_patches_pred_folder = args.preds_test.joinpath(f'part_{best_part_id}')
 
         tester = SlideInferencer(slides_metadata_paths=test_slides_metadata_paths,
