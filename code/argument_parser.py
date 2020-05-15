@@ -338,8 +338,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
     def with_resume_checkpoint(self):
         self.add_argument("--resume_checkpoint",
-                          type=bool,
-                          default=False,
+                          action="store_true",
                           help="Resume model from checkpoint file")
         return self
 
