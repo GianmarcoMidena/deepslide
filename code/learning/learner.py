@@ -21,7 +21,7 @@ class Learner:
     def __init__(self, batch_size: int, num_workers: int,
                  device: torch.device, classes: List[str], learning_rate: float,
                  weight_decay: float, learning_rate_decay: float,
-                 resume_checkpoint: bool, resume_checkpoint_path: Path, log_csv: Path,
+                 resume_checkpoint: bool, resume_checkpoint_path: Path, last_val_acc: float, log_csv: Path,
                  color_jitter_brightness: float, color_jitter_contrast: float,
                  color_jitter_hue: float, color_jitter_saturation: float, num_classes: int,
                  num_layers: int, pretrain: bool, checkpoints_folder: Path,
@@ -60,6 +60,7 @@ class Learner:
         self._learning_rate_decay = learning_rate_decay
         self._resume_checkpoint = resume_checkpoint
         self._resume_checkpoint_path = resume_checkpoint_path
+        self._last_val_acc = last_val_acc
         self._log_csv = log_csv
         self._color_jitter_brightness = color_jitter_brightness
         self._color_jitter_contrast = color_jitter_contrast
@@ -267,7 +268,10 @@ class Learner:
                                        dtype=torch.long).cpu()
         early_stopper = EarlyStopper(patience=self._early_stopping_patience, mode=EarlyStopper.Mode.MAX)
 
-        best_val_acc = 0.
+        if self._resume_checkpoint and self._last_val_acc:
+            best_val_acc = self._last_val_acc
+        else:
+            best_val_acc = 0.
 
         # Train for specified number of epochs.
         for epoch in range(start_epoch, self._num_epochs):

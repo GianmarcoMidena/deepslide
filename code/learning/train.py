@@ -49,37 +49,55 @@ def train(args):
             # Named with date and time.
             log_csv = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
 
-            # Training the ResNet.
-            Learner(batch_size=args.batch_size,
-                    checkpoints_folder=checkpoints_folder,
-                    classes=args.classes,
-                    color_jitter_brightness=args.color_jitter_brightness,
-                    color_jitter_contrast=args.color_jitter_contrast,
-                    color_jitter_hue=args.color_jitter_hue,
-                    color_jitter_saturation=args.color_jitter_saturation,
-                    device=args.device,
-                    learning_rate=args.learning_rate,
-                    learning_rate_decay=args.learning_rate_decay,
-                    log_csv=log_csv,
-                    num_classes=args.num_classes,
-                    num_layers=args.num_layers,
-                    num_workers=args.num_workers,
-                    pretrain=args.pretrain,
-                    resume_checkpoint=args.resume_checkpoint,
-                    resume_checkpoint_path=resume_checkpoint_path,
-                    num_epochs=args.num_epochs,
-                    weight_decay=args.weight_decay,
-                    early_stopping_patience=args.early_stopping,
-                    train_slides_metadata_paths=train_slides_metadata_paths,
-                    val_slides_metadata_paths=val_slides_metadata_paths,
-                    train_patch_metadata_paths=train_patch_metadata_paths,
-                    val_patch_metadata_paths=val_patch_metadata_paths,
-                    class_idx_path=args.class_idx,
-                    spatial_sensitive=args.spatial_sensitive,
-                    patch_size=args.patch_size).train()
+            _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths,
+                   train_slides_metadata_paths, val_patch_metadata_paths, val_slides_metadata_paths)
 
         if not args.nested_cross_validation:
             break
+
+    if not args.nested_cross_validation:
+        part_name = 'full'
+        checkpoints_folder = args.checkpoints_root.joinpath(part_name)
+        resume_checkpoint_path = checkpoints_folder.joinpath(args.checkpoint_file)
+        log_csv = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
+
+        _train(args, checkpoints_folder, log_csv, resume_checkpoint_path,
+               train_slides_metadata_paths=slides_metadata_paths,
+               train_patch_metadata_paths=patch_metadata_paths)
+
+
+def _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths,
+           train_slides_metadata_paths, val_patch_metadata_paths, val_slides_metadata_paths):
+    # Training the ResNet.
+    Learner(batch_size=args.batch_size,
+            checkpoints_folder=checkpoints_folder,
+            classes=args.classes,
+            color_jitter_brightness=args.color_jitter_brightness,
+            color_jitter_contrast=args.color_jitter_contrast,
+            color_jitter_hue=args.color_jitter_hue,
+            color_jitter_saturation=args.color_jitter_saturation,
+            device=args.device,
+            learning_rate=args.learning_rate,
+            learning_rate_decay=args.learning_rate_decay,
+            log_csv=log_csv,
+            num_classes=args.num_classes,
+            num_layers=args.num_layers,
+            num_workers=args.num_workers,
+            pretrain=args.pretrain,
+            resume_checkpoint=args.resume_checkpoint,
+            resume_checkpoint_path=resume_checkpoint_path,
+            last_val_acc=args.last_val_acc,
+            num_epochs=args.num_epochs,
+            weight_decay=args.weight_decay,
+            early_stopping_patience=args.early_stopping,
+            train_slides_metadata_paths=train_slides_metadata_paths,
+            val_slides_metadata_paths=val_slides_metadata_paths,
+            train_patch_metadata_paths=train_patch_metadata_paths,
+            val_patch_metadata_paths=val_patch_metadata_paths,
+            class_idx_path=args.class_idx,
+            spatial_sensitive=args.spatial_sensitive,
+            patch_size=args.patch_size).train()
+
 
 def add_parser(subparsers):
     subparsers.add_parser("train") \
@@ -102,6 +120,7 @@ def add_parser(subparsers):
               .with_train_patches_root() \
               .with_checkpoints_root() \
               .with_checkpoint_file() \
+              .with_last_val_acc() \
               .with_log_root() \
               .with_class_idx() \
               .with_fixed_folds() \

@@ -366,6 +366,12 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Checkpoint file to load if resume_checkpoint_path is True")
         return self
 
+    def with_last_val_acc(self):
+        self.add_argument("--last_val_acc",
+                          type=float,
+                          required=False)
+        return self
+
     def with_pretrain(self):
         # ImageNet pretrain?
         self.add_argument("--pretrain",
