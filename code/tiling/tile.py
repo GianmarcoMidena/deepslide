@@ -6,6 +6,7 @@ import pandas as pd
 from .patches_balancer import PatchesBalancer
 from .purple_patch_extractor import PurplePatchExtractor
 from .step_size_finder import StepSizeFinder
+from .tiles_analyzer import TilesAnalyzer
 from ..configurer import Configurer
 
 
@@ -18,7 +19,6 @@ def tile(args):
                                            image_ext=args.image_ext,
                                            num_workers=args.num_workers)
 
-    logging.info("Generating training patches for training...")
     train_patches_folder = args.train_patches_root.joinpath("train")
     val_patches_folder = args.train_patches_root.joinpath("val")
 
@@ -40,67 +40,84 @@ def tile(args):
 
     slides_metadata = slides_metadata.set_index('id', drop=True)
 
-    if args.test_slides_metadata:
-        test_metadata = pd.read_csv(args.test_slides_metadata).set_index('id', drop=True)
-        test_eval_dir = args.eval_patches_root.joinpath('test')
-
-        patch_extractor.extract_all(image_paths=_extract_image_paths(test_metadata), step_size=eval_step_size,
-                                    partition_name='testing', output_folder=test_eval_dir, by_wsi=True)
-
-        report_test_eval = pd.DataFrame([str(x) for c in test_eval_dir.iterdir()
-                                                for x in c.iterdir()], columns=['path'])
-        report_test_eval['id'] = report_test_eval['path'].str.rsplit('/', n=1, expand=True)[1] \
-                                                         .str.rsplit('_', n=2, expand=True)[0]
-        report_test_eval = report_test_eval.set_index('id', drop=True)
-        report_test_eval_part_i = report_test_eval.join(test_metadata['label'], how='inner', sort=False)
-        report_test_eval_part_i.to_csv(test_eval_dir.joinpath(f"test_eval_patches.csv"), index=False)
-
     for metadata_path_i in splits_metadata_paths:
         part_id = metadata_path_i.stem.split("_")[-1]
         part_name = f"part_{part_id}"
         metadata_i = pd.read_csv(metadata_path_i)
-        train_part_name = f'training (part {part_id})'
-        train_dir_i = train_patches_folder.joinpath(part_name)
-        patch_extractor.extract_all_by_class(slides_info=metadata_i, partition_name=train_part_name,
-                                             output_folder=train_dir_i, step_size_finder=step_size_finder)
-        PatchesBalancer(image_dir=train_dir_i, partition_name=train_part_name).balance_by_class()
 
-        report_train_part_i = pd.DataFrame([str(x) for c in train_dir_i.iterdir()
-                                            for x in c.iterdir()], columns=['path'])
-        report_train_part_i['label'] = report_train_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
-        report_train_part_i = report_train_part_i.sample(frac=1., replace=False, random_state=3)
-        report_train_part_i.to_csv(train_patches_folder.joinpath(f"train_patches_part_{part_id}.csv"), index=False)
+        _extract_train_train_patches(metadata_i, part_id, part_name, patch_extractor, step_size_finder,
+                                     train_patches_folder)
 
-        logging.info("Generating validation patches for training...")
-        val_part_name = f'validation (part {part_id})'
-        val_dir_i = val_patches_folder.joinpath(part_name)
-        patch_extractor.extract_all_by_class(slides_info=metadata_i, partition_name=val_part_name,
-                                             output_folder=val_dir_i, step_size=val_step_size)
+        _extract_train_val_patches(metadata_i, part_id, part_name, patch_extractor, val_patches_folder, val_step_size)
 
-        report_val_part_i = pd.DataFrame([str(x) for c in val_dir_i.iterdir()
-                                          for x in c.iterdir()], columns=['path'])
-        report_val_part_i['label'] = report_val_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
-        report_val_part_i.to_csv(val_patches_folder.joinpath(f"val_patches_part_{part_id}.csv"), index=False)
+        _extract_eval_patches(args, eval_step_size, metadata_i, part_id, part_name, patch_extractor, slides_metadata)
 
-        logging.info(f"Generating patches for evaluation...")
-        eval_part_name = f'evaluation (part {part_id})'
+    if args.test_slides_metadata:
+        _extract_test_patches(args, eval_step_size, patch_extractor)
 
-        if args.test_slides_metadata:
-            eval_patches_folder = args.eval_patches_root.joinpath('val')
-        else:
-            eval_patches_folder = args.eval_patches_root
-        eval_dir_i = eval_patches_folder.joinpath(part_name)
+    TilesAnalyzer(args.train_patches_root, args.eval_patches_root, args.image_ext,
+                  args.slides_metadata, args.train_slides_metadata, args.test_slides_metadata,
+                  output_report_dir=Path("patches")).analyze()
 
-        patch_extractor.extract_all(image_paths=_extract_image_paths(metadata_i), step_size=eval_step_size,
-                                    partition_name=eval_part_name, output_folder=eval_dir_i, by_wsi=True)
 
-        report_eval_part_i = pd.DataFrame([str(x) for c in eval_dir_i.iterdir()
-                                           for x in c.iterdir()], columns=['path'])
-        report_eval_part_i['id'] = report_eval_part_i['path'].str.rsplit('/', n=1, expand=True)[1] \
-                                                             .str.rsplit('_', n=2, expand=True)[0]
-        report_eval_part_i = report_eval_part_i.set_index('id', drop=True)
-        report_eval_part_i = report_eval_part_i.join(slides_metadata['label'], how='inner', sort=False)
-        report_eval_part_i.to_csv(eval_patches_folder.joinpath(f"eval_patches_part_{part_id}.csv"), index=False)
+def _extract_test_patches(args, eval_step_size, patch_extractor):
+    test_metadata = pd.read_csv(args.test_slides_metadata).set_index('id', drop=True)
+    test_eval_dir = args.eval_patches_root.joinpath('test')
+    patch_extractor.extract_all(image_paths=_extract_image_paths(test_metadata), step_size=eval_step_size,
+                                partition_name='testing', output_folder=test_eval_dir, by_wsi=True)
+    report_test_eval = pd.DataFrame([str(x) for c in test_eval_dir.iterdir()
+                                     for x in c.iterdir()], columns=['path'])
+    report_test_eval['id'] = report_test_eval['path'].str.rsplit('/', n=1, expand=True)[1] \
+        .str.rsplit('_', n=2, expand=True)[0]
+    report_test_eval = report_test_eval.set_index('id', drop=True)
+    report_test_eval_part_i = report_test_eval.join(test_metadata['label'], how='inner', sort=False)
+    report_test_eval_part_i.to_csv(test_eval_dir.joinpath(f"test_eval_patches.csv"), index=False)
+
+
+def _extract_eval_patches(args, eval_step_size, metadata_i, part_id, part_name, patch_extractor, slides_metadata):
+    logging.info(f"Generating patches for evaluation...")
+    eval_part_name = f'evaluation (part {part_id})'
+    if args.test_slides_metadata:
+        eval_patches_folder = args.eval_patches_root.joinpath('val')
+    else:
+        eval_patches_folder = args.eval_patches_root
+    eval_dir_i = eval_patches_folder.joinpath(part_name)
+    patch_extractor.extract_all(image_paths=_extract_image_paths(metadata_i), step_size=eval_step_size,
+                                partition_name=eval_part_name, output_folder=eval_dir_i, by_wsi=True)
+    report_eval_part_i = pd.DataFrame([str(x) for c in eval_dir_i.iterdir()
+                                       for x in c.iterdir()], columns=['path'])
+    report_eval_part_i['id'] = report_eval_part_i['path'].str.rsplit('/', n=1, expand=True)[1] \
+        .str.rsplit('_', n=2, expand=True)[0]
+    report_eval_part_i = report_eval_part_i.set_index('id', drop=True)
+    report_eval_part_i = report_eval_part_i.join(slides_metadata['label'], how='inner', sort=False)
+    report_eval_part_i.to_csv(eval_patches_folder.joinpath(f"eval_patches_part_{part_id}.csv"), index=False)
+
+
+def _extract_train_val_patches(metadata_i, part_id, part_name, patch_extractor, val_patches_folder, val_step_size):
+    logging.info("Generating validation patches for training...")
+    val_part_name = f'validation (part {part_id})'
+    val_dir_i = val_patches_folder.joinpath(part_name)
+    patch_extractor.extract_all_by_class(slides_info=metadata_i, partition_name=val_part_name,
+                                         output_folder=val_dir_i, step_size=val_step_size)
+    report_val_part_i = pd.DataFrame([str(x) for c in val_dir_i.iterdir()
+                                      for x in c.iterdir()], columns=['path'])
+    report_val_part_i['label'] = report_val_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
+    report_val_part_i.to_csv(val_patches_folder.joinpath(f"val_patches_part_{part_id}.csv"), index=False)
+
+
+def _extract_train_train_patches(metadata_i, part_id, part_name, patch_extractor, step_size_finder, train_patches_folder):
+    logging.info("Generating training patches for training...")
+
+    train_part_name = f'training (part {part_id})'
+    train_dir_i = train_patches_folder.joinpath(part_name)
+    patch_extractor.extract_all_by_class(slides_info=metadata_i, partition_name=train_part_name,
+                                         output_folder=train_dir_i, step_size_finder=step_size_finder)
+    PatchesBalancer(image_dir=train_dir_i, partition_name=train_part_name).balance_by_class()
+    report_train_part_i = pd.DataFrame([str(x) for c in train_dir_i.iterdir()
+                                        for x in c.iterdir()], columns=['path'])
+    report_train_part_i['label'] = report_train_part_i['path'].str.rsplit('/', n=2, expand=True)[1]
+    report_train_part_i = report_train_part_i.sample(frac=1., replace=False, random_state=3)
+    report_train_part_i.to_csv(train_patches_folder.joinpath(f"train_patches_part_{part_id}.csv"), index=False)
 
 
 def _extract_image_paths(slides_info: pd.DataFrame) -> List[Path]:
