@@ -10,7 +10,8 @@ def train(args):
         .build()
 
     slides_metadata_paths = sorted(list(args.slides_splits_dir.glob("*part_*.csv")))
-    patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*part_*.csv")))
+    train_patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('train').glob("*part_*.csv")))
+    val_patch_metadata_paths = sorted(list(args.train_patches_root.joinpath('val').glob("*part_*.csv")))
     tot_splits = len(slides_metadata_paths)
 
     outer_part_ids = list(range(tot_splits))
@@ -38,9 +39,9 @@ def train(args):
                 part_name = f'part_{j + 1}'
 
             val_slides_metadata_paths = [slides_metadata_paths[j]]
-            val_patch_metadata_paths = [patch_metadata_paths[j]]
+            val_patch_metadata_paths_j = [val_patch_metadata_paths[j]]
             train_slides_metadata_paths = slides_metadata_paths[:j] + slides_metadata_paths[j+1:]
-            train_patch_metadata_paths = patch_metadata_paths[:j] + patch_metadata_paths[j+1:]
+            train_patch_metadata_paths_j = train_patch_metadata_paths[:j] + train_patch_metadata_paths[j+1:]
 
             checkpoints_folder = args.checkpoints_root.joinpath(part_name)
             # Only used is resume_checkpoint is True.
@@ -49,25 +50,15 @@ def train(args):
             # Named with date and time.
             log_csv = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
 
-            _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths,
-                   train_slides_metadata_paths, val_patch_metadata_paths, val_slides_metadata_paths)
+            _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths_j,
+                   train_slides_metadata_paths, val_patch_metadata_paths_j, val_slides_metadata_paths)
 
         if not args.nested_cross_validation:
             break
 
-    if not args.nested_cross_validation:
-        part_name = 'full'
-        checkpoints_folder = args.checkpoints_root.joinpath(part_name)
-        resume_checkpoint_path = checkpoints_folder.joinpath(args.checkpoint_file)
-        log_csv = get_log_csv_name(log_folder=args.log_root.joinpath(part_name))
 
-        _train(args, checkpoints_folder, log_csv, resume_checkpoint_path,
-               train_slides_metadata_paths=slides_metadata_paths,
-               train_patch_metadata_paths=patch_metadata_paths)
-
-
-def _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths,
-           train_slides_metadata_paths, val_patch_metadata_paths, val_slides_metadata_paths):
+def _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patch_metadata_paths_j,
+           train_slides_metadata_paths, val_patch_metadata_paths_j, val_slides_metadata_paths):
     # Training the ResNet.
     Learner(batch_size=args.batch_size,
             checkpoints_folder=checkpoints_folder,
@@ -92,8 +83,8 @@ def _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patc
             early_stopping_patience=args.early_stopping,
             train_slides_metadata_paths=train_slides_metadata_paths,
             val_slides_metadata_paths=val_slides_metadata_paths,
-            train_patch_metadata_paths=train_patch_metadata_paths,
-            val_patch_metadata_paths=val_patch_metadata_paths,
+            train_patch_metadata_paths=train_patch_metadata_paths_j,
+            val_patch_metadata_paths=val_patch_metadata_paths_j,
             class_idx_path=args.class_idx,
             spatial_sensitive=args.spatial_sensitive,
             patch_size=args.patch_size).train()
