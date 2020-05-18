@@ -3,6 +3,7 @@ import pandas as pd
 import json
 
 from typing import List
+from collections import Iterable
 
 
 class TilesAnalyzer:
@@ -29,30 +30,22 @@ class TilesAnalyzer:
             slides_metadata = slides_metadata.append(pd.read_csv(str(self._test_slides_metadata)), ignore_index=True, sort=False)
 
         all_slide_ids = slides_metadata['id']
-
         tiled_slide_ids = self._extract_slide_ids()
-
         untiled_slide_ids = all_slide_ids[~all_slide_ids.isin(tiled_slide_ids)]
 
         report['n_slides'] = len(all_slide_ids)
         report['n_untiled_slides'] = len(untiled_slide_ids)
 
-        train_report = {
-            'n_tiled_slides': len(self._extract_slide_ids(self._train_patches_root))
-        }
+        train_report = self._calc_stats(self._train_patches_root)
         for p in self._train_patches_root.iterdir():
             if p.is_dir():
-                report_p = {
-                    'n_tiled_slides': len(self._extract_slide_ids(p))
-                }
+                report_p = self._calc_stats(p)
                 for p2 in p.iterdir():
                     if p2.is_dir():
-                        report_p2 = {
-                            'n_tiled_slides': len(self._extract_slide_ids(p2))
-                        }
+                        report_p2 = self._calc_stats(p2)
                         for c in p2.iterdir():
                             if c.is_dir():
-                                report_p2[f'n_tiled_slides_{c.name}'] = len(self._extract_slide_ids(c))
+                                report_p2[c.name] = self._calc_stats(c)
                         report_p[p2.name] = report_p2
                 train_report[p.name] = report_p
         report['train'] = train_report
@@ -60,25 +53,13 @@ class TilesAnalyzer:
         eval_report = {}
         for p in self._eval_patches_root.iterdir():
             if p.is_dir():
-                tiled_slides_p = self._extract_slide_ids(p)
-                report_p = {
-                    'n_tiled_slides': len(tiled_slides_p)
-                }
-                slides_metadata_p = slides_metadata[slides_metadata['id'].isin(tiled_slides_p)]
-                for c in slides_metadata_p['label'].unique():
-                    tiled_slides_c = slides_metadata_p.loc[slides_metadata_p['label'] == c, 'label']
-                    report_p[f'n_tiled_slides_{c}'] = len(tiled_slides_c)
+                report_p = self._calc_stats(p)
+                report_p.update(self._calc_stats_by_class(p, slides_metadata))
                 if p.name == 'val':
                     for p2 in p.iterdir():
                         if p2.is_dir():
-                            report_p2 = {}
-                            tiled_slides_p2 = self._extract_slide_ids(p2)
-                            report_p2['n_tiled_slides'] = len(tiled_slides_p2)
-                            slides_metadata_p2 = slides_metadata[slides_metadata['id'].isin(tiled_slides_p2)]
-                            for c in slides_metadata_p2['label'].unique():
-                                tiled_slides_c = slides_metadata_p2.loc[slides_metadata_p2['label'] == c,
-                                                                        'label']
-                                report_p2[f'n_tiled_slides_{c}'] = len(tiled_slides_c)
+                            report_p2 = self._calc_stats(p2)
+                            report_p2.update(self._calc_stats_by_class(p2, slides_metadata))
                             report_p[p2.name] = report_p2
                 eval_report[p.name] = report_p
         report['eval'] = eval_report
@@ -87,19 +68,66 @@ class TilesAnalyzer:
         with self._output_report_dir.joinpath("output_analysis.json").open(mode="w") as fp:
             json.dump(report, fp, indent=True)
 
-    def _extract_slide_ids(self, root: Path = None):
+    def _extract_slide_ids(self, *paths: Path):
         tile_paths = []
 
-        if not root:
-            roots = [self._train_patches_root, self._eval_patches_root]
-        else:
-            roots = [root]
+        if not paths:
+            paths = [self._train_patches_root, self._eval_patches_root]
 
-        for r in roots:
-            tile_paths += r.rglob(f"*.{self._image_ext}")
+        for p in paths:
+            tile_paths += p.rglob(f"*.{self._image_ext}")
 
         tiled_slide_ids = pd.Series(tile_paths).apply(str) \
                                                .str.rsplit("/", n=1, expand=True)[1] \
                                                .str.rsplit("_", n=2, expand=True)[0] \
                                                .unique()
         return tiled_slide_ids
+
+    def _calc_stats(self, paths = None, ids = None):
+        tile_paths = []
+
+        if ids:
+            if not isinstance(ids, Iterable):
+                ids = [ids]
+
+        if paths:
+            if not isinstance(paths, Iterable):
+                paths = [paths]
+        else:
+            paths = [self._train_patches_root, self._eval_patches_root]
+
+        for p in paths:
+            if ids:
+                for id in ids:
+                    tile_paths += p.rglob(f"{id}*.{self._image_ext}")
+            else:
+                if p.is_dir():
+                    tile_paths += p.rglob(f"*.{self._image_ext}")
+
+        slide_ids = pd.Series(tile_paths).apply(str) \
+                                         .str.rsplit("/", n=1, expand=True)[1] \
+                                         .str.rsplit("_", n=2, expand=True)[0]
+
+        distinct_slide_ids = slide_ids.unique()
+        n_tiles_per_slide = slide_ids.value_counts()
+
+        return {
+            'n_slides': len(distinct_slide_ids),
+            'n_tiles': int(n_tiles_per_slide.sum()),
+            'mean_n_tiles_per_slide': n_tiles_per_slide.mean(),
+            'std_n_tiles_per_slide': n_tiles_per_slide.std(),
+            'min_n_tiles_per_slide': int(n_tiles_per_slide.min()),
+            '25%_n_tiles_per_slide': n_tiles_per_slide.quantile(q=0.25),
+            'median_n_tiles_per_slide': n_tiles_per_slide.median(),
+            '75%_n_tiles_per_slide': n_tiles_per_slide.quantile(q=0.75),
+            'max_n_tiles_per_slide': int(n_tiles_per_slide.max())
+        }
+
+    def _calc_stats_by_class(self, p: Path, slides_metadata: pd.DataFrame):
+        report = {}
+        tiled_slide_ids = self._extract_slide_ids(p)
+        tiled_slides_metadata = slides_metadata[slides_metadata['id'].isin(tiled_slide_ids)]
+        for c in tiled_slides_metadata['label'].unique():
+            slide_ids_c = tiled_slides_metadata.loc[tiled_slides_metadata['label'] == c, 'id'].tolist()
+            report[c] = self._calc_stats(ids=slide_ids_c, paths=p)
+        return report
