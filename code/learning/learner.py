@@ -17,6 +17,7 @@ from code.learning.early_stopper import EarlyStopper
 from code.learning.random90rotation import Random90Rotation
 from code.model import Model
 
+
 class Learner:
     def __init__(self, batch_size: int, num_workers: int,
                  device: torch.device, classes: List[str], learning_rate: float,
@@ -28,7 +29,7 @@ class Learner:
                  num_epochs: int, early_stopping_patience: int,
                  train_slides_metadata_paths: List[Path], val_slides_metadata_paths: List[Path],
                  train_patch_metadata_paths: List[Path], val_patch_metadata_paths: List[Path],
-                 class_idx_path: Path, spatial_sensitive: bool, patch_size: int):
+                 class_idx_path: Path, spatial_sensitive: bool, n_spatial_features: int, patch_size: int):
         """
         Args:
             batch_size: Mini-batch size to use for learning.
@@ -78,6 +79,7 @@ class Learner:
         self._val_patch_metadata_paths = val_patch_metadata_paths
         self._class_idx_path = class_idx_path
         self._spatial_sensitive = spatial_sensitive
+        self._n_spatial_features = n_spatial_features
         self._patch_size = patch_size
 
     def train(self) -> None:
@@ -108,7 +110,8 @@ class Learner:
         model = Model(num_classes=self._num_classes,
                       num_layers=self._num_layers,
                       pretrain=self._pretrain,
-                      spatial_sensitive=self._spatial_sensitive)
+                      spatial_sensitive=self._spatial_sensitive,
+                      n_spatial_features=self._n_spatial_features)
 
         model = model.to(device=self._device)
         optimizer = optim.Adam(params=model.parameters(),

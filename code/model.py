@@ -2,8 +2,10 @@ import torch
 import torchvision
 import torch.nn.functional as F
 
+
 class Model(torch.nn.Module):
-    def __init__(self, num_layers: int, num_classes: int, pretrain: bool, spatial_sensitive: bool):
+    def __init__(self, num_layers: int, num_classes: int, pretrain: bool, spatial_sensitive: bool = False,
+                 n_spatial_features: int = 64):
         """
         Args:
             num_layers: Number of layers to use in the ResNet model from [18, 34, 50, 101, 152].
@@ -13,7 +15,7 @@ class Model(torch.nn.Module):
         super().__init__()
         self._num_layers = num_layers
         self._pretrain = pretrain
-        self._spatial_sensitive = spatial_sensitive
+        self._spatial_sensitive = spatial_sensitive and n_spatial_features > 0
 
         if num_classes < 3:
             self._num_classes = 1
@@ -23,9 +25,9 @@ class Model(torch.nn.Module):
         self._resnet = self._make_resnet()
         fc_in_features = self._resnet.fc.in_features
         self._resnet.fc = torch.nn.Identity()
-        if spatial_sensitive:
-            self._spatial_transformer = torch.nn.Linear(2, 8)
-            fc_in_features += 8
+        if self._spatial_sensitive:
+            self._spatial_transformer = torch.nn.Linear(2, n_spatial_features)
+            fc_in_features += n_spatial_features
         self._fc = torch.nn.Linear(in_features=fc_in_features, out_features=self._num_classes)
 
     def forward(self, *inputs):

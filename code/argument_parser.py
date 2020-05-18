@@ -99,6 +99,14 @@ class ArgumentParser(argparse.ArgumentParser):
         )
         return self
 
+    def with_n_spatial_features(self):
+        self.add_argument(
+            "--n_spatial_features",
+            type=int,
+            default=64
+        )
+        return self
+
     def with_path_column(self):
         self.add_argument(
             "--path_column",

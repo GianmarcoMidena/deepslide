@@ -87,6 +87,7 @@ def _train(args, checkpoints_folder, log_csv, resume_checkpoint_path, train_patc
             val_patch_metadata_paths=val_patch_metadata_paths_j,
             class_idx_path=args.class_idx,
             spatial_sensitive=args.spatial_sensitive,
+            n_spatial_features=args.n_spatial_features,
             patch_size=args.patch_size).train()
 
 
@@ -117,5 +118,6 @@ def add_parser(subparsers):
               .with_fixed_folds() \
               .with_nested_cross_validation() \
               .with_spatial_sensitivity() \
+              .with_n_spatial_features() \
               .with_patch_size() \
               .set_defaults(func=train)

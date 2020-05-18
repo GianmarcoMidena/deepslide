@@ -1,9 +1,8 @@
-from pathlib import Path
-import pandas as pd
 import json
-
-from typing import List
 from collections import Iterable
+from pathlib import Path
+
+import pandas as pd
 
 
 class TilesAnalyzer:

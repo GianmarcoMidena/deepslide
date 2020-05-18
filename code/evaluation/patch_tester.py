@@ -20,7 +20,7 @@ class PatchTester:
                  classes: List[str], num_classes: int,
                  num_layers: int, pretrain: bool,
                  batch_size: int, num_workers: int, patch_size: int,
-                 spatial_sensitive: bool):
+                 spatial_sensitive: bool, n_spatial_features: int):
         self._auto_select = auto_select
         self._batch_size = batch_size
         self._checkpoints_folder = checkpoints_folder
@@ -33,6 +33,7 @@ class PatchTester:
         self._pretrain = pretrain
         self._patch_size = patch_size
         self._spatial_sensitive = spatial_sensitive
+        self._n_spatial_features = n_spatial_features
         self._model = None
         """
         Args:
@@ -139,7 +140,9 @@ class PatchTester:
             model_path = self._eval_model
         model = Model(num_classes=self._num_classes,
                       num_layers=self._num_layers,
-                      pretrain=self._pretrain, spatial_sensitive=self._spatial_sensitive)
+                      pretrain=self._pretrain,
+                      spatial_sensitive=self._spatial_sensitive,
+                      n_spatial_features=self._n_spatial_features)
         ckpt = torch.load(f=model_path)
         model.load_state_dict(state_dict=ckpt["model_state_dict"])
         model = model.to(device=self._device)

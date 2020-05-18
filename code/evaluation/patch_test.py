@@ -58,7 +58,8 @@ def patch_evaluate(args):
                                  num_workers=args.num_workers,
                                  pretrain=args.pretrain,
                                  patch_size=args.patch_size,
-                                 spatial_sensitive=args.spatial_sensitive)
+                                 spatial_sensitive=args.spatial_sensitive,
+                                 n_spatial_features=args.n_spatial_features)
 
             # Apply the model to the validation patches.
             tester.predict(patches_metadata_paths=val_patch_metadata_paths,
@@ -96,4 +97,5 @@ def add_parser(subparsers):
         .with_test_slides_metadata() \
         .with_patch_size() \
         .with_spatial_sensitivity() \
+        .with_n_spatial_features() \
         .set_defaults(func=patch_evaluate)
