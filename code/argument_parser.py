@@ -55,7 +55,12 @@ class ArgumentParser(argparse.ArgumentParser):
 
     def with_downscale_factor(self):
         self.add_argument("--downscale_factor",
-                          type=int, required=True)
+                          type=int, required=False)
+        return self
+
+    def with_min_dim_size(self):
+        self.add_argument("--min_dim_size",
+                          type=int, required=False)
         return self
 
     def with_slides_metadata(self):

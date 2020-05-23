@@ -10,6 +10,7 @@ def downscale(args):
                      original_slide_ext=args.original_slide_ext,
                      new_slide_ext=args.image_ext,
                      downscale_factor=args.downscale_factor,
+                     min_dim_size=args.min_dim_size,
                      num_workers=args.num_workers).downscale()
 
 
@@ -20,5 +21,6 @@ def add_parser(subparsers):
         .with_original_slide_ext() \
         .with_image_ext() \
         .with_downscale_factor() \
+        .with_min_dim_size() \
         .with_num_workers() \
         .set_defaults(func=downscale)
