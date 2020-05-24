@@ -1,5 +1,6 @@
 import logging
 import math
+import traceback
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 import numpy as np
@@ -51,41 +52,120 @@ class SlidesDownscaler:
     def _downscale_slide(self, slide_path: Path) -> bool:
         try:
             slide = OpenSlide(str(slide_path))
-            downscaled_slide = self.__downscale_slide(slide)
-            logging.info("Calculating path...")
-            output_path = self._calc_new_wsi_path(slide_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            logging.info("Saving...")
-            downscaled_slide.save(output_path)
+            self.__downscale_slide(slide, slide_path)
             return True
-        except Exception as e:  # OpenSlideError, FileNotFoundError
+        except:  # OpenSlideError, FileNotFoundError
             logging.info("Error...")
-            logging.error(f"{slide_path.stem}: {e}")
+            logging.error(f"{slide_path.stem}: {traceback.format_exc()}")
             return False
 
     def _is_downscaled(self, original_wsi_path):
         downscaled_slide_path = self._calc_new_wsi_path(original_wsi_path)
-        return downscaled_slide_path.is_file()
+        return len(list(downscaled_slide_path.parent
+                        .rglob(f"{downscaled_slide_path.stem}*{downscaled_slide_path.suffix}"))) > 0
 
-    def _calc_new_wsi_path(self, original_wsi_path):
-        return self._new_slides_root.joinpath(original_wsi_path.parent.name) \
-            .joinpath(f"{original_wsi_path.stem}.{self._new_slide_ext}")
+    def _calc_new_wsi_path(self, original_wsi_path, part: str = None):
+        dir_path = self._new_slides_root.joinpath(original_wsi_path.parent.name)
+        if part:
+            path = dir_path.joinpath(f"{original_wsi_path.stem}_{part}")
+        else:
+            path = dir_path.joinpath(f"{original_wsi_path.stem}")
+        return path.with_suffix(f".{self._new_slide_ext}")
 
-    def __downscale_slide(self, slide: OpenSlide):
+    def __downscale_slide(self, slide: OpenSlide, slide_path: Path):
+        # logging.info("Downscaling a slide...")
+        original_width, original_height = slide.dimensions
+        # logging.info(f"original dims: {(original_width, original_height)}")
+
         if self._min_dim_size:
             downscale_factor = self._calc_downscale_factor(slide)
         else:
             downscale_factor = self._downscale_factor
 
+        # logging.info(f"downscale factor: {downscale_factor}")
+
         level = slide.get_best_level_for_downsample(downscale_factor)
 
-        whole_slide_image = slide.read_region(location=(0, 0), level=level, size=slide.level_dimensions[level])
+        # logging.info(f"level: {level}")
 
-        if self._new_slide_ext.lower() in self._RGB_EXTENSIONS:
-            whole_slide_image = whole_slide_image.convert("RGB")
+        level_width, level_height = slide.level_dimensions[level]
+        # logging.info(f"level width={level_width}, height={level_height}")
 
-        new_dimensions = self._calc_downscaled_sizes(slide, downscale_factor)
-        return whole_slide_image.resize(new_dimensions, PIL.Image.ANTIALIAS)
+        # logging.info("calc target dims...")
+        target_width, target_height = self._calc_downscaled_sizes(slide, downscale_factor)
+        # logging.info(f"target dims = {(target_width, target_height)}")
+
+        if level_width * level_height < 1e9:
+            # logging.info("Reading region...")
+            whole_slide_image = slide.read_region(location=(0, 0), level=level, size=(level_width, level_height))
+
+            # logging.info("Converting to RGB...")
+            if self._new_slide_ext.lower() in self._RGB_EXTENSIONS:
+                whole_slide_image = whole_slide_image.convert("RGB")
+
+            # logging.info("Resizing...")
+            whole_slide_image = whole_slide_image.resize((target_width, target_height), PIL.Image.ANTIALIAS)
+
+            # logging.info("Calculating path...")
+            output_path = self._calc_new_wsi_path(slide_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            # logging.info("Saving...")
+            whole_slide_image.save(output_path)
+        else:
+            n_vertical_splits = self._find_best_n_splits(level_height)
+            n_horizontal_splits = self._find_best_n_splits(level_width)
+
+            # logging.info(f"n_vertical_splits={n_vertical_splits}, n_horizontal_splits={n_horizontal_splits}")
+
+            original_tile_height = math.ceil(original_height / n_vertical_splits)
+            original_tile_width = math.ceil(original_width / n_horizontal_splits)
+
+            level_tile_height = math.ceil(level_height / n_vertical_splits)
+            level_tile_width = math.ceil(level_width / n_horizontal_splits)
+
+            # logging.info(f"level_tile_width:{level_width / n_horizontal_splits} "
+            #              f"approx:{math.ceil(level_width / n_horizontal_splits)}")
+
+            # target_tile_height = math.ceil(target_height / n_vertical_splits)
+            # target_tile_width = math.ceil(target_width / n_horizontal_splits)
+
+            for i in range(n_vertical_splits):
+                for j in range(n_horizontal_splits):
+                    y_i = original_tile_height * i
+                    x_j = original_tile_width * j
+                    # logging.info(f"x_j={x_j}, y_i={y_i}")
+
+                    level_height_i = min(level_tile_height, level_height - level_tile_height * i)
+                    # target_height_i = min(target_tile_height, target_tile_height * (n_vertical_splits - 1))
+
+                    level_width_j = min(level_tile_width, level_width - level_tile_width * j)
+                    # target_width_j = min(target_tile_width, target_tile_width * (n_horizontal_splits - 1))
+
+                    # logging.info(f"level height_i={level_height_i}, width_j={level_width_j}")
+                    # logging.info(f"target height_i={target_height_i}, width_j={target_width_j}")
+
+                    # logging.info(f"Reading region {i}_{j}...")
+                    whole_slide_image_tile = slide.read_region(location=(x_j, y_i), level=level,
+                                                               size=(level_width_j, level_height_i))
+
+                    # logging.info(f"Converting to RGB {i}_{j}...")
+                    whole_slide_image_tile = whole_slide_image_tile.convert("RGB")
+
+                    # logging.info("Resizing...")
+                    # whole_slide_image_tile = whole_slide_image_tile.resize((target_width_j, target_height_i),
+                    #                                                        PIL.Image.ANTIALIAS)
+
+                    # logging.info("Calculating path...")
+                    output_path = self._calc_new_wsi_path(slide_path, part=f"{i}_{j}")
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    # logging.info("Saving...")
+                    whole_slide_image_tile.save(output_path)
+
+    def _calc_downscale_factor(self, slide: OpenSlide):
+        width, height = slide.dimensions
+        smallest_dim = min(width, height)
+        scale_factor = math.floor(smallest_dim / self._min_dim_size)
+        return scale_factor
 
     @staticmethod
     def _calc_downscaled_sizes(slide: OpenSlide, downscale_factor: int):
@@ -94,8 +174,23 @@ class SlidesDownscaler:
         downscale_height = math.floor(height / downscale_factor)
         return downscale_weight, downscale_height
 
-    def _calc_downscale_factor(self, slide: OpenSlide):
-        width, height = slide.dimensions
-        smallest_dim = min(width, height)
-        scale_factor = math.floor(smallest_dim / self._min_dim_size)
-        return scale_factor
+    def _find_best_n_splits(self, full_length):
+        length_divisors = np.asarray(self._find_divisors(full_length))
+        final_lengths = full_length / length_divisors
+        target_length = 5e3
+        distances_to_target_length = np.abs(final_lengths - target_length)
+        best_length_divisor = length_divisors[distances_to_target_length.argmin()]
+        return best_length_divisor
+
+    @staticmethod
+    def _find_divisors(v: int):
+        divisors = [1, v]
+        for d in range(2, math.floor(math.sqrt(v)) + 1):
+            if v % d == 0:
+                a, b = d, int(v / d)
+                if a != b:
+                    divisors += [a, b]
+                else:
+                    divisors.append(a)
+        divisors.sort()
+        return divisors
