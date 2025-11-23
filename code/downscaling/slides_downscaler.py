@@ -4,6 +4,7 @@ import traceback
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 import PIL
 from PIL import Image
@@ -27,12 +28,12 @@ class SlidesDownscaler:
         self._num_workers = num_workers
 
     def downscale(self):
-        slide_paths = self._search_slide_paths_for_downscaling()
+        slide_paths, n_downscaled_slides = self._search_slide_paths_for_downscaling()
         tot_slides_to_downscale = len(slide_paths)
         logging.info(f"{tot_slides_to_downscale} slides to downscale")
-        pool = ThreadPool(processes=self._num_workers)
-        n_downscaled_slides = 0
+        tot_slides = tot_slides_to_downscale + n_downscaled_slides
         n_discarded_slides = 0
+        pool = ThreadPool(processes=self._num_workers)
         for downscaled in pool.imap_unordered(self._downscale_slide, slide_paths):
             if downscaled:
                 n_downscaled_slides += 1
@@ -40,14 +41,33 @@ class SlidesDownscaler:
                 n_discarded_slides += 1
             logging.info(f"{n_downscaled_slides} downscaled slides, "
                          f"{n_discarded_slides} discarded slides "
-                         f"out of {tot_slides_to_downscale} total slides")
+                         f"out of {tot_slides} total slides")
 
     def _search_slide_paths_for_downscaling(self):
         class_paths = extract_subfolder_paths(self._original_slides_root)
         slide_paths = []
         for class_path in class_paths:
             slide_paths += search_folder_file_paths(class_path)
-        return [p for p in slide_paths if not self._is_downscaled(p)]
+        n_downscaled_slides = 0
+        downscaled_slide_names = pd.Series(self._new_slides_root.rglob(f"*.{self._new_slide_ext}")).apply(str)\
+                                   .str.rsplit("/", n=1, expand=True)[1]\
+                                   .str.rsplit(".", n=1, expand=True)[0]
+        filtered_slide_paths = []
+        for slide_path in slide_paths:
+            if not downscaled_slide_names.str.startswith(slide_path.stem).any():
+                filtered_slide_paths.append(slide_path)
+            else:
+                n_downscaled_slides += 1
+        return filtered_slide_paths, n_downscaled_slides
+
+    # def _is_downscaled(self, slide_path):
+    #     downscaled_slide_path = self._calc_new_wsi_path(slide_path)
+    #     if list(downscaled_slide_path.parent
+    #                                  .rglob(f"{downscaled_slide_path.stem}*{downscaled_slide_path.suffix}")):
+    #         downscaled = True
+    #     else:
+    #         downscaled = False
+    #     return downscaled, slide_path
 
     def _downscale_slide(self, slide_path: Path) -> bool:
         try:
@@ -58,11 +78,6 @@ class SlidesDownscaler:
             logging.info("Error...")
             logging.error(f"{slide_path.stem}: {traceback.format_exc()}")
             return False
-
-    def _is_downscaled(self, original_wsi_path):
-        downscaled_slide_path = self._calc_new_wsi_path(original_wsi_path)
-        return len(list(downscaled_slide_path.parent
-                        .rglob(f"{downscaled_slide_path.stem}*{downscaled_slide_path.suffix}"))) > 0
 
     def _calc_new_wsi_path(self, original_wsi_path, part: str = None):
         dir_path = self._new_slides_root.joinpath(original_wsi_path.parent.name)
@@ -115,7 +130,7 @@ class SlidesDownscaler:
             n_vertical_splits = self._find_best_n_splits(level_height)
             n_horizontal_splits = self._find_best_n_splits(level_width)
 
-            # logging.info(f"n_vertical_splits={n_vertical_splits}, n_horizontal_splits={n_horizontal_splits}")
+            logging.info(f"\"{slide_path.stem}\" slide: {n_vertical_splits} vertical splits, {n_horizontal_splits} horizontal splits")
 
             original_tile_height = math.ceil(original_height / n_vertical_splits)
             original_tile_width = math.ceil(original_width / n_horizontal_splits)

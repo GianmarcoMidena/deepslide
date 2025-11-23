@@ -60,19 +60,3 @@ class PurplePatchExtractor(PatchExtractor):
         num_purple = pooled.shape[0]
 
         return num_purple > self._purple_threshold
-
-    def _calc_coords(self, image: np.ndarray,
-                     step_size: int):
-        x_steps = self._count_x_steps(image, step_size)
-        y_steps = self._count_y_steps(image, step_size)
-
-        return itertools.product(range(0, x_steps * step_size, step_size),
-                                 range(0, y_steps * step_size, step_size))
-
-    def _count_x_steps(self, image: np.ndarray,
-                       step_size: int):
-        return int((image.shape[0] - self._patch_size) / step_size) + 1
-
-    def _count_y_steps(self, image: np.ndarray,
-                       step_size: int):
-        return int((image.shape[1] - self._patch_size) / step_size) + 1

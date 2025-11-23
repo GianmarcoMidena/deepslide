@@ -120,7 +120,7 @@ class PatchExtractor(ABC):
         x_start, y_start = xy_start
 
         patch = image[x_start:x_start + self._patch_size,
-                      y_start:y_start + self._patch_size, :]
+                y_start:y_start + self._patch_size, :]
         # Sometimes the images are RGBA instead of RGB. Only keep RGB channels.
         patch = patch[..., [0, 1, 2]]
 
@@ -156,8 +156,7 @@ class PatchExtractor(ABC):
                 f"{image_name}_{x_start}_{y_start}.{self._image_ext}")
         imsave(uri=output_path, im=patch)
 
-    def _calc_coords(self, image: np.ndarray,
-                     step_size: int):
+    def _calc_coords(self, image: np.ndarray, step_size: int):
         x_steps = self._count_x_steps(image, step_size)
         y_steps = self._count_y_steps(image, step_size)
 
